@@ -1,67 +1,72 @@
 # Dynamic Table Manager
 
-A flexible web application for creating and managing custom tables with editable rows and columns. Perfect for tracking countries visited, workaway projects, flights, tasks, or any structured data you need to organize.
+A powerful web application that creates **actual PostgreSQL tables** in your Supabase database with custom columns. Unlike traditional apps that store data in JSON, this creates real database tables that you can query, edit, and manage directly.
 
 ## Features
 
-- **Dynamic Table Creation**: Create unlimited tables with custom column structures
-- **Full CRUD Operations**: Create, Read, Update, and Delete rows in your tables
-- **Inline Editing**: Edit any row with a simple modal interface
-- **Secure Configuration**: Each user configures their own Supabase credentials (no hardcoded keys)
-- **Persistent Storage**: Data stored in Supabase with automatic syncing
-- **Table View**: See all your data in a clean, organized table format
-- **Responsive Design**: Works on desktop and mobile devices
+- **Real Database Tables**: Creates actual PostgreSQL tables in Supabase (not JSON storage)
+- **Dynamic Schema**: Define custom columns for each table
+- **Full CRUD Operations**: Create, Read, Update, and Delete rows
+- **Edit Functionality**: Modify any row after creation
+- **Secure Configuration**: User-provided credentials (no hardcoded keys)
+- **Direct Database Access**: Tables are real PostgreSQL tables you can access via SQL
 
 ## Prerequisites
 
-Before using this application, you need:
-
 1. A Supabase account (free tier available at [supabase.com](https://supabase.com))
-2. A Supabase project with two tables configured (see Database Setup below)
-3. Your Supabase project URL and anon key
+2. A Supabase project
+3. Two database functions configured (see Database Setup below)
+4. Your Supabase project URL and anon key
 
 ## Database Setup
 
-In your Supabase project, create the following two tables:
+### Step 1: Create Required Functions
 
-### Table 1: `tables`
+Go to your Supabase SQL Editor and run these two functions:
 
-```sql
-CREATE TABLE tables (
-  id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
-  name TEXT NOT NULL,
-  columns JSONB NOT NULL,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW())
-);
-```
-
-### Table 2: `table_rows`
+#### Function 1: `execute_sql` (Creates/Drops Tables)
 
 ```sql
-CREATE TABLE table_rows (
-  id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
-  table_id BIGINT REFERENCES tables(id) ON DELETE CASCADE,
-  data JSONB NOT NULL,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW())
-);
+CREATE OR REPLACE FUNCTION execute_sql(sql_query text)
+RETURNS void AS $$
+BEGIN
+  EXECUTE sql_query;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 ```
 
-### Enable Row Level Security (Optional but Recommended)
-
-For multi-user scenarios, enable RLS policies:
+#### Function 2: `get_user_tables` (Lists All Tables)
 
 ```sql
--- Enable RLS
-ALTER TABLE tables ENABLE ROW LEVEL SECURITY;
-ALTER TABLE table_rows ENABLE ROW LEVEL SECURITY;
-
--- Allow all operations for authenticated users
-CREATE POLICY "Allow all for authenticated users" ON tables
-  FOR ALL USING (auth.role() = 'authenticated');
-
-CREATE POLICY "Allow all for authenticated users" ON table_rows
-  FOR ALL USING (auth.role() = 'authenticated');
+CREATE OR REPLACE FUNCTION get_user_tables()
+RETURNS TABLE(table_name text, columns jsonb) AS $$
+BEGIN
+  RETURN QUERY
+  SELECT 
+    t.table_name::text,
+    jsonb_agg(
+      jsonb_build_object(
+        'column_name', c.column_name,
+        'data_type', c.data_type
+      ) ORDER BY c.ordinal_position
+    ) as columns
+  FROM information_schema.tables t
+  LEFT JOIN information_schema.columns c 
+    ON t.table_name = c.table_name 
+    AND t.table_schema = c.table_schema
+  WHERE t.table_schema = 'public'
+    AND t.table_type = 'BASE TABLE'
+  GROUP BY t.table_name
+  ORDER BY t.table_name;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 ```
+
+### Why These Functions?
+
+- **execute_sql**: Allows the app to run CREATE TABLE and DROP TABLE commands
+- **get_user_tables**: Lists all your tables and their columns
+- **SECURITY DEFINER**: Runs with elevated privileges (required for schema modifications)
 
 ## Installation
 
@@ -74,65 +79,97 @@ CREATE POLICY "Allow all for authenticated users" ON table_rows
 
 3. **Open `index.html` in your web browser**
 
-That's it! No build process or server required.
+No build process or server required!
 
 ## Configuration
 
 ### First-Time Setup
 
-1. Open the application in your browser
-2. Click the **⚙️ Settings** button
-3. Enter your Supabase credentials:
-   - **Supabase URL**: Found in Project Settings → API → Project URL
-   - **Supabase Anon Key**: Found in Project Settings → API → Project API keys → anon/public
+1. Run the two SQL functions in Supabase (see Database Setup above)
+2. Open the application in your browser
+3. Click **⚙️ Settings**
+4. Enter your Supabase credentials:
+   - **Supabase URL**: Project Settings → API → Project URL
+   - **Supabase Anon Key**: Project Settings → API → anon/public key
+5. Click **Save & Connect**
 
-4. Click **Save & Connect**
-
-Your credentials are stored locally in your browser's localStorage and never leave your device.
-
-### Finding Your Supabase Credentials
-
-1. Go to your Supabase project dashboard
-2. Click on **Settings** (gear icon in the sidebar)
-3. Navigate to **API** section
-4. Copy:
-   - **Project URL** (e.g., `https://xxxxx.supabase.co`)
-   - **anon/public key** (starts with `eyJhbGc...`)
+Your credentials are stored locally in your browser's localStorage.
 
 ## Usage
 
 ### Creating a New Table
 
 1. Click **Create New Table**
-2. Enter a name for your table (e.g., "countries_visited", "workaway_projects")
-3. Add column names (e.g., "country", "city", "date")
-4. Click **Add Another Column** to add more columns
-5. Click **Create Table**
+2. Enter a table name (e.g., `countries_visited`, `workaway_projects`)
+   - Use lowercase letters, numbers, and underscores only
+   - Must start with a letter
+3. Add column names (e.g., `country`, `city`, `date`)
+   - Same naming rules as table name
+4. Click **Create Table**
 
-### Adding Rows to a Table
+This will create a **real PostgreSQL table** in your Supabase database with:
+- An auto-incrementing `id` column (primary key)
+- Your custom columns (all TEXT type)
+- A `created_at` timestamp column
 
-1. Fill in any or all of the input fields for your columns
+### Adding Rows
+
+1. Fill in any or all column fields
 2. Click **Add Row** or press **Enter**
 3. The row appears in the table below
 
 ### Editing a Row
 
-1. Click the **Edit** button on any row
-2. Modify the values in the modal
+1. Click **Edit** on any row
+2. Modify the values
 3. Click **Save Changes**
-4. The row is updated in the table
 
 ### Deleting a Row
 
-1. Click the **Delete** button on any row
-2. Confirm the deletion
-3. The row is permanently removed
+1. Click **Delete** on any row
+2. Confirm deletion
 
 ### Deleting a Table
 
-1. Click the **Delete Table** button on any table
-2. Confirm the deletion
-3. The table and all its rows are permanently removed
+1. Click **Delete Table**
+2. Confirm deletion
+3. **Warning**: This permanently drops the entire table and all data!
+
+## How It Works
+
+### Traditional List Apps vs This App
+
+**Traditional Approach** (what you had before):
+```
+Database:
+  - lists table (stores list metadata)
+  - list_items table (stores all data in JSON column)
+  
+Structure:
+  lists: { id, name, columns: ["country", "city"] }
+  list_items: { id, list_id, data: {"country": "France", "city": "Paris"} }
+```
+
+**This App** (real tables):
+```
+Database:
+  - countries_visited table (real columns)
+  - workaway_projects table (real columns)
+  - flights table (real columns)
+  
+Structure:
+  countries_visited: { id, country, city, date, created_at }
+  workaway_projects: { id, host, location, rating, created_at }
+```
+
+### Advantages
+
+- **Better Performance**: Real columns are faster than JSON queries
+- **SQL Access**: You can query your tables directly in Supabase SQL Editor
+- **Type Safety**: Each column can have its own data type (currently TEXT)
+- **Indexes**: You can add indexes to specific columns
+- **Relations**: You can create foreign keys between your tables
+- **Standard SQL**: Works with any PostgreSQL tool or library
 
 ## File Structure
 
@@ -145,27 +182,20 @@ dynamic-table-manager/
 
 ## Technology Stack
 
-- **Frontend**: Pure HTML, CSS, and JavaScript (no frameworks)
+- **Frontend**: Pure HTML, CSS, and JavaScript
 - **Database**: Supabase (PostgreSQL)
 - **Storage**: LocalStorage for configuration
 - **CDN**: Supabase JS Client v2
-
-## Key Differences from List Manager
-
-This table-based system differs from a traditional list manager:
-
-- **Editable Rows**: Every row can be edited after creation
-- **Table Format**: Data displayed in clean, organized tables with columns and rows
-- **Action Buttons**: Each row has Edit and Delete buttons for easy management
-- **Better for Structured Data**: Perfect when you need to maintain and update records over time
 
 ## Security Notes
 
 - **No Hardcoded Credentials**: All credentials are user-provided
 - **Local Storage**: Credentials stored only in your browser
-- **HTTPS Required**: Supabase URLs use secure HTTPS connections
-- **Anon Key**: Uses the public anon key (safe for client-side use)
-- **RLS**: Enable Row Level Security for production use
+- **SECURITY DEFINER**: Required for schema modifications - be careful who has access
+- **Anon Key**: Uses public anon key (safe for client-side)
+- **Single User**: Best for personal use or trusted users only
+
+⚠️ **Important**: The `execute_sql` function with SECURITY DEFINER allows running arbitrary SQL. Only use this for personal projects or trusted environments.
 
 ## Browser Compatibility
 
@@ -182,49 +212,65 @@ Tested on:
 
 ## Common Issues
 
-### "Not Connected" Status
+### "Please set up the database function"
 
-**Solution**: Click Settings and verify your Supabase URL and key are correct
+**Solution**: Run the two SQL functions in your Supabase SQL Editor (see Database Setup)
 
-### "Error loading tables"
+### "function execute_sql does not exist"
 
-**Solutions**:
-- Check that both database tables exist in Supabase
-- Verify table names are exactly `tables` and `table_rows`
-- Verify RLS policies allow access
-- Check browser console for detailed error messages
+**Solution**: Create the `execute_sql` function in Supabase
+
+### Table name errors
+
+**Solution**: Use only lowercase letters, numbers, and underscores. Start with a letter.
 
 ### Settings Not Saving
 
-**Solution**: Ensure your browser allows localStorage and isn't in private/incognito mode
+**Solution**: Ensure your browser allows localStorage and isn't in private/incognbito mode
 
 ## Examples of Use Cases
 
-- **Travel Tracking**: Countries visited with dates, cities, and notes (with ability to update dates/cities)
-- **Workaway Projects**: Host, location, dates, ratings (update status as projects progress)
-- **Flight Log**: Flight number, route, date, aircraft type (edit if details change)
-- **Book Library**: Title, author, year, rating (update ratings after reading)
-- **Project Management**: Project name, status, deadline, team (edit status and deadlines)
-- **Inventory Management**: Item name, quantity, location, price (update quantities)
-- **Contact List**: Name, email, phone, company (keep contact details current)
+- **Travel Log**: `countries_visited` with columns: country, city, date, notes
+- **Workaway Projects**: `workaway_projects` with columns: host, location, start_date, end_date, rating
+- **Flight Log**: `flights` with columns: flight_number, from, to, date, aircraft
+- **Book Library**: `books` with columns: title, author, year, rating, status
+- **Inventory**: `inventory` with columns: item, quantity, location, price
+- **Contacts**: `contacts` with columns: name, email, phone, company
 
-## Customization
+## Direct Database Access
 
-### Modifying Styles
+Because this creates real tables, you can:
 
-Edit `style.css` to customize colors, fonts, spacing, and layout.
+1. **Query in Supabase SQL Editor**:
+   ```sql
+   SELECT * FROM countries_visited WHERE country = 'France';
+   ```
 
-### Adding Features
+2. **Add Indexes**:
+   ```sql
+   CREATE INDEX idx_country ON countries_visited(country);
+   ```
 
-The modular structure makes it easy to add features like:
-- Sorting columns
+3. **Change Column Types**:
+   ```sql
+   ALTER TABLE flights ALTER COLUMN date TYPE DATE USING date::DATE;
+   ```
+
+4. **Add Constraints**:
+   ```sql
+   ALTER TABLE inventory ADD CONSTRAINT positive_quantity CHECK (quantity::int > 0);
+   ```
+
+## Future Enhancements
+
+Potential features to add:
+- Column type selection (TEXT, INTEGER, DATE, etc.)
+- Column constraints (NOT NULL, UNIQUE, etc.)
+- Foreign key relationships
+- Export to CSV
 - Search and filtering
-- Export to CSV/Excel
-- Column type validation
-- Date pickers
-- Inline editing (edit directly in table)
-- Bulk operations
-- Row reordering
+- Sorting columns
+- Pagination for large tables
 
 ## License
 
@@ -233,22 +279,24 @@ This project is provided as-is for personal and commercial use.
 ## Support
 
 For issues related to:
-- **This application**: Check the code comments and console logs
+- **This application**: Check browser console for errors
 - **Supabase**: Visit [supabase.com/docs](https://supabase.com/docs)
-- **Database setup**: See the Database Setup section above
+- **PostgreSQL**: Visit [postgresql.org/docs](https://www.postgresql.org/docs/)
 
 ## Contributing
 
-Feel free to fork and modify this project for your needs!
+Feel free to fork and modify this project!
 
 ## Changelog
 
+### Version 3.0
+- Complete rewrite to create real PostgreSQL tables
+- Dynamic table creation with custom columns
+- Direct database table management
+- Real SQL table operations (CREATE, DROP)
+
 ### Version 2.0
-- Complete rewrite to table-based system
-- Added edit functionality for rows
-- Added proper table display with columns
-- Improved data organization
-- Better visual hierarchy
+- Table-based system with JSON storage
 
 ### Version 1.0
-- Initial release (list-based system)
+- Initial list-based system
