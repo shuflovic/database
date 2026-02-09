@@ -1,15 +1,15 @@
-# Dynamic Lists Manager
+# Dynamic Table Manager
 
-A flexible web application for creating and managing custom lists with dynamic columns. Perfect for tracking countries visited, workaway projects, flights, tasks, or any structured data you need to organize.
+A flexible web application for creating and managing custom tables with editable rows and columns. Perfect for tracking countries visited, workaway projects, flights, tasks, or any structured data you need to organize.
 
 ## Features
 
-- **Dynamic List Creation**: Create unlimited lists with custom column structures
-- **Flexible Data Entry**: Add items to your lists with any combination of column values
+- **Dynamic Table Creation**: Create unlimited tables with custom column structures
+- **Full CRUD Operations**: Create, Read, Update, and Delete rows in your tables
+- **Inline Editing**: Edit any row with a simple modal interface
 - **Secure Configuration**: Each user configures their own Supabase credentials (no hardcoded keys)
 - **Persistent Storage**: Data stored in Supabase with automatic syncing
-- **Clean Interface**: Simple, intuitive UI with modal-based interactions
-- **Real-time Updates**: Instant list updates when adding or deleting items
+- **Table View**: See all your data in a clean, organized table format
 - **Responsive Design**: Works on desktop and mobile devices
 
 ## Prerequisites
@@ -24,10 +24,10 @@ Before using this application, you need:
 
 In your Supabase project, create the following two tables:
 
-### Table 1: `lists`
+### Table 1: `tables`
 
 ```sql
-CREATE TABLE lists (
+CREATE TABLE tables (
   id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
   name TEXT NOT NULL,
   columns JSONB NOT NULL,
@@ -35,12 +35,12 @@ CREATE TABLE lists (
 );
 ```
 
-### Table 2: `list_items`
+### Table 2: `table_rows`
 
 ```sql
-CREATE TABLE list_items (
+CREATE TABLE table_rows (
   id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
-  list_id BIGINT REFERENCES lists(id) ON DELETE CASCADE,
+  table_id BIGINT REFERENCES tables(id) ON DELETE CASCADE,
   data JSONB NOT NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW())
 );
@@ -52,14 +52,14 @@ For multi-user scenarios, enable RLS policies:
 
 ```sql
 -- Enable RLS
-ALTER TABLE lists ENABLE ROW LEVEL SECURITY;
-ALTER TABLE list_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE tables ENABLE ROW LEVEL SECURITY;
+ALTER TABLE table_rows ENABLE ROW LEVEL SECURITY;
 
 -- Allow all operations for authenticated users
-CREATE POLICY "Allow all for authenticated users" ON lists
+CREATE POLICY "Allow all for authenticated users" ON tables
   FOR ALL USING (auth.role() = 'authenticated');
 
-CREATE POLICY "Allow all for authenticated users" ON list_items
+CREATE POLICY "Allow all for authenticated users" ON table_rows
   FOR ALL USING (auth.role() = 'authenticated');
 ```
 
@@ -101,30 +101,43 @@ Your credentials are stored locally in your browser's localStorage and never lea
 
 ## Usage
 
-### Creating a New List
+### Creating a New Table
 
-1. Click **Create New List**
-2. Enter a name for your list (e.g., "Countries Visited")
+1. Click **Create New Table**
+2. Enter a name for your table (e.g., "countries_visited", "workaway_projects")
 3. Add column names (e.g., "country", "city", "date")
 4. Click **Add Another Column** to add more columns
-5. Click **Create List**
+5. Click **Create Table**
 
-### Adding Items to a List
+### Adding Rows to a Table
 
 1. Fill in any or all of the input fields for your columns
-2. Click **Add** or press **Enter**
-3. The item appears in the list below
+2. Click **Add Row** or press **Enter**
+3. The row appears in the table below
 
-### Deleting a List
+### Editing a Row
 
-1. Click the **Delete List** button on any list
+1. Click the **Edit** button on any row
+2. Modify the values in the modal
+3. Click **Save Changes**
+4. The row is updated in the table
+
+### Deleting a Row
+
+1. Click the **Delete** button on any row
 2. Confirm the deletion
-3. The list and all its items are permanently removed
+3. The row is permanently removed
+
+### Deleting a Table
+
+1. Click the **Delete Table** button on any table
+2. Confirm the deletion
+3. The table and all its rows are permanently removed
 
 ## File Structure
 
 ```
-dynamic-lists-manager/
+dynamic-table-manager/
 ├── index.html      # Main HTML structure and modals
 ├── style.css       # All styling and responsive design
 └── script.js       # Application logic and Supabase integration
@@ -136,6 +149,15 @@ dynamic-lists-manager/
 - **Database**: Supabase (PostgreSQL)
 - **Storage**: LocalStorage for configuration
 - **CDN**: Supabase JS Client v2
+
+## Key Differences from List Manager
+
+This table-based system differs from a traditional list manager:
+
+- **Editable Rows**: Every row can be edited after creation
+- **Table Format**: Data displayed in clean, organized tables with columns and rows
+- **Action Buttons**: Each row has Edit and Delete buttons for easy management
+- **Better for Structured Data**: Perfect when you need to maintain and update records over time
 
 ## Security Notes
 
@@ -164,10 +186,11 @@ Tested on:
 
 **Solution**: Click Settings and verify your Supabase URL and key are correct
 
-### "Error loading lists"
+### "Error loading tables"
 
 **Solutions**:
 - Check that both database tables exist in Supabase
+- Verify table names are exactly `tables` and `table_rows`
 - Verify RLS policies allow access
 - Check browser console for detailed error messages
 
@@ -177,13 +200,13 @@ Tested on:
 
 ## Examples of Use Cases
 
-- **Travel Tracking**: Countries visited with dates and cities
-- **Workaway Projects**: Host, location, dates, and notes
-- **Flight Log**: Flight number, route, date, aircraft type
-- **Book Library**: Title, author, year, rating
-- **Project Management**: Project name, status, deadline, team
-- **Recipe Collection**: Recipe name, cuisine, difficulty, time
-- **Expense Tracking**: Item, category, amount, date
+- **Travel Tracking**: Countries visited with dates, cities, and notes (with ability to update dates/cities)
+- **Workaway Projects**: Host, location, dates, ratings (update status as projects progress)
+- **Flight Log**: Flight number, route, date, aircraft type (edit if details change)
+- **Book Library**: Title, author, year, rating (update ratings after reading)
+- **Project Management**: Project name, status, deadline, team (edit status and deadlines)
+- **Inventory Management**: Item name, quantity, location, price (update quantities)
+- **Contact List**: Name, email, phone, company (keep contact details current)
 
 ## Customization
 
@@ -194,13 +217,14 @@ Edit `style.css` to customize colors, fonts, spacing, and layout.
 ### Adding Features
 
 The modular structure makes it easy to add features like:
-- Item editing
-- Export to CSV
+- Sorting columns
 - Search and filtering
-- Item sorting
+- Export to CSV/Excel
 - Column type validation
 - Date pickers
-- Multi-user collaboration
+- Inline editing (edit directly in table)
+- Bulk operations
+- Row reordering
 
 ## License
 
@@ -219,9 +243,12 @@ Feel free to fork and modify this project for your needs!
 
 ## Changelog
 
+### Version 2.0
+- Complete rewrite to table-based system
+- Added edit functionality for rows
+- Added proper table display with columns
+- Improved data organization
+- Better visual hierarchy
+
 ### Version 1.0
-- Initial release
-- Dynamic list creation
-- Supabase integration
-- User-configurable credentials
-- CRUD operations for lists and items
+- Initial release (list-based system)
