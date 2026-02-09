@@ -359,7 +359,7 @@ async function addRow(tableName) {
 }
 
 // Load data for a specific table
-async function loadTableData(tableName) {
+async function loadTableData(tableName, limit = 10) {
     if (!supabaseClient) {
         return;
     }
