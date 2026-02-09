@@ -3,15 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dynamic Lists Manager</title>
+    <title>Dynamic Table Manager</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="header">
-        <h1>Dynamic Lists Manager</h1>
-        <p>Create and manage your custom lists - countries visited, projects, flights, anything!</p>
+        <h1>Dynamic Table Manager</h1>
+        <p>Create and manage your custom tables - track anything with rows and columns!</p>
         <div>
-            <button class="create-list-btn" id="createListBtn" onclick="openCreateModal()" disabled>Create New List</button>
+            <button class="create-list-btn" id="createTableBtn" onclick="openCreateModal()" disabled>Create New Table</button>
             <button class="settings-btn" onclick="openSettingsModal()">⚙️ Settings</button>
             <span class="connection-status disconnected" id="connectionStatus">Not Connected</span>
         </div>
@@ -19,7 +19,7 @@
 
     <div id="status"></div>
     
-    <div id="listsContainer">
+    <div id="tablesContainer">
         <div class="setup-required">
             <h2>Welcome! 👋</h2>
             <p>To get started, you need to configure your Supabase connection.</p>
@@ -52,17 +52,17 @@
         </div>
     </div>
 
-    <!-- Create List Modal -->
+    <!-- Create Table Modal -->
     <div id="createModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h2>Create New List</h2>
+                <h2>Create New Table</h2>
                 <span class="close" onclick="closeCreateModal()">&times;</span>
             </div>
             
             <div class="form-group">
-                <label for="listName">List Name:</label>
-                <input type="text" id="listName" placeholder="e.g., Countries Visited, Workaway Projects">
+                <label for="tableName">Table Name:</label>
+                <input type="text" id="tableName" placeholder="e.g., countries_visited, workaway_projects">
             </div>
             
             <div class="form-group">
@@ -73,7 +73,21 @@
                 <button type="button" class="add-column-btn" onclick="addColumnInput()">Add Another Column</button>
             </div>
             
-            <button class="submit-btn" onclick="createList()">Create List</button>
+            <button class="submit-btn" onclick="createTable()">Create Table</button>
+        </div>
+    </div>
+
+    <!-- Edit Row Modal -->
+    <div id="editModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Edit Row</h2>
+                <span class="close" onclick="closeEditModal()">&times;</span>
+            </div>
+            
+            <div id="editFormContainer"></div>
+            
+            <button class="submit-btn" onclick="saveEdit()">Save Changes</button>
         </div>
     </div>
 
