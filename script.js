@@ -365,10 +365,22 @@ async function loadTableData(tableName, limit = 10) {
     }
 
     try {
+        // Get total count first (to know if "Show more" is needed)
+        const { count, error: countError } = await supabaseClient
+            .from(tableName)
+            .select('*', { count: 'exact', head: true });
+
+        if (countError) {
+            document.getElementById(`table-data-${tableName}`).innerHTML = '<div class="empty-table">Error loading count</div>';
+            return;
+        }
+
+        // Fetch limited rows
         const { data, error } = await supabaseClient
             .from(tableName)
             .select('*')
-            .order('created_at', { ascending: true });
+            .order('created_at', { ascending: true })
+            .limit(limit);
 
         if (error) {
             document.getElementById(`table-data-${tableName}`).innerHTML = '<div class="empty-table">Error loading data</div>';
@@ -376,28 +388,25 @@ async function loadTableData(tableName, limit = 10) {
         }
 
         const tableContainer = document.getElementById(`table-data-${tableName}`);
-        
+
         if (!data || data.length === 0) {
             tableContainer.innerHTML = '<div class="empty-table">No rows yet. Add some data above!</div>';
             return;
         }
 
-        // Get table info
+        // Get visible columns (exclude id & created_at)
         const table = tables.find(t => t.table_name === tableName);
         const columns = table.columns
             .map(col => col.column_name)
             .filter(name => name !== 'id' && name !== 'created_at');
 
-        // Create table HTML
+        // Build table HTML
         let tableHtml = '<table class="data-table"><thead><tr>';
-        
-        // Add column headers
         columns.forEach(col => {
             tableHtml += `<th>${col}</th>`;
         });
         tableHtml += '<th>Actions</th></tr></thead><tbody>';
 
-        // Add rows
         data.forEach(row => {
             tableHtml += '<tr>';
             columns.forEach(col => {
@@ -405,19 +414,30 @@ async function loadTableData(tableName, limit = 10) {
                 tableHtml += `<td>${value}</td>`;
             });
             tableHtml += `<td>
-                <button class="action-btn" onclick='openEditModal(${row.id}, "${tableName}")'>Edit</button>
-                <button class="action-btn delete-btn" onclick='deleteRow(${row.id}, "${tableName}")'>Delete</button>
+                <button class="action-btn" onclick="openEditModal(${row.id}, '${tableName}')">Edit</button>
+                <button class="action-btn delete-btn" onclick="deleteRow(${row.id}, '${tableName}')">Delete</button>
             </td></tr>`;
         });
 
         tableHtml += '</tbody></table>';
+
+        // Show more button if needed
+        if (count > limit) {
+            tableHtml += `
+                <div style="text-align: center; margin: 15px 0;">
+                    <button class="add-row-btn" 
+                            onclick="loadTableData('${tableName}', ${limit + 20})">
+                        Show more (${count - limit} remaining)
+                    </button>
+                </div>`;
+        }
+
         tableContainer.innerHTML = tableHtml;
     } catch (error) {
         document.getElementById(`table-data-${tableName}`).innerHTML = '<div class="empty-table">Connection error</div>';
         console.error('Error:', error);
     }
 }
-
 // Edit Modal functions
 function openEditModal(rowId, tableName) {
     if (!supabaseClient) {
