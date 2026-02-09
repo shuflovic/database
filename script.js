@@ -203,7 +203,7 @@ async function loadTables() {
 
     try {
         // Query the information_schema to get all user tables
-        const { data, error } = await supabaseClient.rpc('get_user_tables');
+        const { data, error } = await supabaseClient.rpc('get_user_tables', {});
 
         if (error) {
             // If the function doesn't exist, show instructions
