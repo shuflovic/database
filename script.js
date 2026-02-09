@@ -13,7 +13,8 @@ function loadSettings() {
         try {
             supabaseClient = supabase.createClient(url, key);
             updateConnectionStatus(true);
-            document.getElementById('createTableBtn').disabled = false;
+            const btn = document.getElementById('createTableBtn');
+            if (btn) btn.disabled = false;
             loadTables();
             return true;
         } catch (error) {
@@ -28,6 +29,8 @@ function loadSettings() {
 // Update connection status indicator
 function updateConnectionStatus(connected) {
     const statusEl = document.getElementById('connectionStatus');
+    if (!statusEl) return;
+    
     if (connected) {
         statusEl.className = 'connection-status connected';
         statusEl.textContent = '✓ Connected';
@@ -84,7 +87,8 @@ function saveSettings() {
         supabaseClient = supabase.createClient(url, key);
         
         updateConnectionStatus(true);
-        document.getElementById('createTableBtn').disabled = false;
+        const btn = document.getElementById('createTableBtn');
+        if (btn) btn.disabled = false;
         
         showStatus('Settings saved! Loading your tables...');
         closeSettingsModal();
