@@ -349,3 +349,24 @@ body {
     background-color: #f8f9fa;
     border-radius: 4px;
 }
+
+#tablesContainer {
+  display: grid;
+  grid-template-columns: 1fr;           /* mobile: 1 column */
+  gap: 20px;
+  margin-top: 20px;
+}
+
+@media (min-width: 768px) {
+  #tablesContainer {
+    grid-template-columns: repeat(2, 1fr);  /* tablet: 2 */
+  }
+}
+
+@media (min-width: 1024px) {
+  #tablesContainer {
+    grid-template-columns: repeat(4, 1fr);  /* desktop: 4 */
+    max-width: 1400px;
+    margin: 30px auto;
+  }
+}
