@@ -22,6 +22,21 @@
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
         
+        .settings-btn {
+            background-color: #6c757d;
+            color: white;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-left: 10px;
+        }
+        
+        .settings-btn:hover {
+            background-color: #5a6268;
+        }
+        
         .create-list-btn {
             background-color: #007bff;
             color: white;
@@ -37,6 +52,11 @@
             background-color: #0056b3;
         }
         
+        .create-list-btn:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        
         .modal {
             display: none;
             position: fixed;
@@ -50,7 +70,7 @@
         
         .modal-content {
             background-color: white;
-            margin: 15% auto;
+            margin: 10% auto;
             padding: 20px;
             border-radius: 8px;
             width: 80%;
@@ -85,12 +105,25 @@
             font-weight: bold;
         }
         
-        .form-group input {
+        .form-group input,
+        .form-group textarea {
             width: 100%;
             padding: 8px;
             border: 1px solid #ddd;
             border-radius: 4px;
             box-sizing: border-box;
+        }
+        
+        .form-group textarea {
+            min-height: 80px;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        
+        .form-group small {
+            display: block;
+            color: #6c757d;
+            margin-top: 5px;
         }
         
         .columns-input {
@@ -226,11 +259,54 @@
             border: 1px solid #f5c6cb;
         }
         
+        .warning {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        
         .no-lists {
             text-align: center;
             color: #6c757d;
             font-style: italic;
             margin-top: 40px;
+        }
+        
+        .setup-required {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            text-align: center;
+            margin-top: 20px;
+        }
+        
+        .setup-required h2 {
+            color: #007bff;
+            margin-bottom: 15px;
+        }
+        
+        .setup-required p {
+            color: #6c757d;
+            margin-bottom: 20px;
+        }
+        
+        .connection-status {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            margin-left: 10px;
+        }
+        
+        .connected {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        
+        .disconnected {
+            background-color: #f8d7da;
+            color: #721c24;
         }
     </style>
 </head>
@@ -238,13 +314,46 @@
     <div class="header">
         <h1>Dynamic Lists Manager</h1>
         <p>Create and manage your custom lists - countries visited, projects, flights, anything!</p>
-        <button class="create-list-btn" onclick="openCreateModal()">Create New List</button>
+        <div>
+            <button class="create-list-btn" id="createListBtn" onclick="openCreateModal()" disabled>Create New List</button>
+            <button class="settings-btn" onclick="openSettingsModal()">⚙️ Settings</button>
+            <span class="connection-status disconnected" id="connectionStatus">Not Connected</span>
+        </div>
     </div>
 
     <div id="status"></div>
     
     <div id="listsContainer">
-        <div class="no-lists">No lists created yet. Click "Create New List" to get started!</div>
+        <div class="setup-required">
+            <h2>Welcome! 👋</h2>
+            <p>To get started, you need to configure your Supabase connection.</p>
+            <p>Click the "⚙️ Settings" button above to enter your Supabase URL and API key.</p>
+            <button class="submit-btn" onclick="openSettingsModal()">Configure Settings</button>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Supabase Configuration</h2>
+                <span class="close" onclick="closeSettingsModal()">&times;</span>
+            </div>
+            
+            <div class="form-group">
+                <label for="supabaseUrl">Supabase URL:</label>
+                <input type="text" id="supabaseUrl" placeholder="https://your-project.supabase.co">
+                <small>Your Supabase project URL (found in Project Settings)</small>
+            </div>
+            
+            <div class="form-group">
+                <label for="supabaseKey">Supabase Anon Key:</label>
+                <textarea id="supabaseKey" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."></textarea>
+                <small>Your Supabase anon/public key (found in Project Settings → API)</small>
+            </div>
+            
+            <button class="submit-btn" onclick="saveSettings()">Save & Connect</button>
+        </div>
     </div>
 
     <!-- Create List Modal -->
@@ -276,32 +385,116 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     
     <script>
-const SUPABASE_URL = 'https://rigsljqkzlnemypqjlbk.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJpZ3NsanFremxuZW15cHFqbGJrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDU2NjI5NTUsImV4cCI6MjA2MTIzODk1NX0.hNdNu9fHGQfdh4WdMFx_SQAVjXvQutBIud3D5CkM9uY';
-const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
-        
         // Global variables
+        let supabaseClient = null;
         let lists = [];
 
+        // Load settings from localStorage
+        function loadSettings() {
+            const url = localStorage.getItem('supabase_url');
+            const key = localStorage.getItem('supabase_key');
+            
+            if (url && key) {
+                try {
+                    supabaseClient = supabase.createClient(url, key);
+                    updateConnectionStatus(true);
+                    document.getElementById('createListBtn').disabled = false;
+                    loadLists();
+                    return true;
+                } catch (error) {
+                    console.error('Error creating Supabase client:', error);
+                    updateConnectionStatus(false);
+                    return false;
+                }
+            }
+            return false;
+        }
+
+        // Update connection status indicator
+        function updateConnectionStatus(connected) {
+            const statusEl = document.getElementById('connectionStatus');
+            if (connected) {
+                statusEl.className = 'connection-status connected';
+                statusEl.textContent = '✓ Connected';
+            } else {
+                statusEl.className = 'connection-status disconnected';
+                statusEl.textContent = '✗ Not Connected';
+            }
+        }
+
         // Show status messages
-        function showStatus(message, isError = false) {
+        function showStatus(message, type = 'success') {
             const statusDiv = document.getElementById('status');
-            statusDiv.innerHTML = `<div class="status ${isError ? 'error' : 'success'}">${message}</div>`;
+            statusDiv.innerHTML = `<div class="status ${type}">${message}</div>`;
             setTimeout(() => {
                 statusDiv.innerHTML = '';
             }, 3000);
         }
 
-        // Modal functions
+        // Settings Modal functions
+        function openSettingsModal() {
+            const url = localStorage.getItem('supabase_url') || '';
+            const key = localStorage.getItem('supabase_key') || '';
+            
+            document.getElementById('supabaseUrl').value = url;
+            document.getElementById('supabaseKey').value = key;
+            document.getElementById('settingsModal').style.display = 'block';
+        }
+
+        function closeSettingsModal() {
+            document.getElementById('settingsModal').style.display = 'none';
+        }
+
+        function saveSettings() {
+            const url = document.getElementById('supabaseUrl').value.trim();
+            const key = document.getElementById('supabaseKey').value.trim();
+
+            if (!url || !key) {
+                showStatus('Please enter both URL and API key', 'error');
+                return;
+            }
+
+            // Validate URL format
+            if (!url.startsWith('https://') || !url.includes('supabase.co')) {
+                showStatus('Invalid Supabase URL format', 'error');
+                return;
+            }
+
+            try {
+                // Save to localStorage
+                localStorage.setItem('supabase_url', url);
+                localStorage.setItem('supabase_key', key);
+
+                // Create client
+                supabaseClient = supabase.createClient(url, key);
+                
+                updateConnectionStatus(true);
+                document.getElementById('createListBtn').disabled = false;
+                
+                showStatus('Settings saved! Loading your lists...');
+                closeSettingsModal();
+                
+                // Load lists
+                loadLists();
+            } catch (error) {
+                showStatus('Error connecting to Supabase. Check your credentials.', 'error');
+                console.error('Error:', error);
+            }
+        }
+
+        // Create List Modal functions
         function openCreateModal() {
+            if (!supabaseClient) {
+                showStatus('Please configure Supabase settings first', 'warning');
+                openSettingsModal();
+                return;
+            }
             document.getElementById('createModal').style.display = 'block';
             document.getElementById('listName').focus();
         }
 
         function closeCreateModal() {
             document.getElementById('createModal').style.display = 'none';
-            // Reset form
             document.getElementById('listName').value = '';
             document.getElementById('columnsContainer').innerHTML = '<input type="text" class="columns-input" placeholder="Column name (e.g., country, city, date)">';
         }
@@ -317,6 +510,11 @@ const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
         // Create new list
         async function createList() {
+            if (!supabaseClient) {
+                showStatus('Not connected to Supabase', 'error');
+                return;
+            }
+
             const listName = document.getElementById('listName').value.trim();
             const columnInputs = document.querySelectorAll('.columns-input');
             const columns = Array.from(columnInputs)
@@ -324,12 +522,12 @@ const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
                 .filter(col => col !== '');
 
             if (!listName) {
-                showStatus('Please enter a list name', true);
+                showStatus('Please enter a list name', 'error');
                 return;
             }
 
             if (columns.length === 0) {
-                showStatus('Please add at least one column', true);
+                showStatus('Please add at least one column', 'error');
                 return;
             }
 
@@ -343,20 +541,24 @@ const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
                     .select();
 
                 if (error) {
-                    showStatus(`Error creating list: ${error.message}`, true);
+                    showStatus(`Error creating list: ${error.message}`, 'error');
                 } else {
                     showStatus(`List "${listName}" created successfully!`);
                     closeCreateModal();
                     loadLists();
                 }
             } catch (error) {
-                showStatus('Connection error', true);
+                showStatus('Connection error', 'error');
                 console.error('Error:', error);
             }
         }
 
         // Load all lists
         async function loadLists() {
+            if (!supabaseClient) {
+                return;
+            }
+
             try {
                 const { data, error } = await supabaseClient
                     .from('lists')
@@ -364,14 +566,14 @@ const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
                     .order('created_at', { ascending: true });
 
                 if (error) {
-                    showStatus(`Error loading lists: ${error.message}`, true);
+                    showStatus(`Error loading lists: ${error.message}`, 'error');
                     return;
                 }
 
                 lists = data || [];
                 renderLists();
             } catch (error) {
-                showStatus('Connection error', true);
+                showStatus('Connection error', 'error');
                 console.error('Error:', error);
             }
         }
@@ -434,6 +636,11 @@ const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
         // Add item to list
         async function addItem(listId) {
+            if (!supabaseClient) {
+                showStatus('Not connected to Supabase', 'error');
+                return;
+            }
+
             const listDiv = document.getElementById(`list-${listId}`);
             const inputs = listDiv.querySelectorAll('.add-item-form input');
             
@@ -449,7 +656,7 @@ const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
             });
 
             if (!hasData) {
-                showStatus('Please fill in at least one field', true);
+                showStatus('Please fill in at least one field', 'error');
                 return;
             }
 
@@ -462,21 +669,23 @@ const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
                     }]);
 
                 if (error) {
-                    showStatus(`Error adding item: ${error.message}`, true);
+                    showStatus(`Error adding item: ${error.message}`, 'error');
                 } else {
-                    // Clear inputs
                     inputs.forEach(input => input.value = '');
-                    // Reload items for this list
                     loadListItems(listId);
                 }
             } catch (error) {
-                showStatus('Connection error', true);
+                showStatus('Connection error', 'error');
                 console.error('Error:', error);
             }
         }
 
         // Load items for a specific list
         async function loadListItems(listId) {
+            if (!supabaseClient) {
+                return;
+            }
+
             try {
                 const { data, error } = await supabaseClient
                     .from('list_items')
@@ -500,7 +709,7 @@ const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
                     const itemData = Object.entries(item.data)
                         .map(([key, value]) => `<strong>${key}:</strong> ${value}`)
                         .join(' | ');
-                    return `<div class="item">${item.id}: ${itemData}</div>`;
+                    return `<div class="item">${itemData}</div>`;
                 }).join('');
 
                 itemsContainer.innerHTML = itemsHtml;
@@ -512,45 +721,53 @@ const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
         // Delete list
         async function deleteList(listId) {
+            if (!supabaseClient) {
+                showStatus('Not connected to Supabase', 'error');
+                return;
+            }
+
             if (!confirm('Are you sure you want to delete this list and all its items?')) {
                 return;
             }
 
             try {
-                // Delete items first
-                await supabase
+                await supabaseClient
                     .from('list_items')
                     .delete()
                     .eq('list_id', listId);
 
-                // Delete list
                 const { error } = await supabaseClient
                     .from('lists')
                     .delete()
                     .eq('id', listId);
 
                 if (error) {
-                    showStatus(`Error deleting list: ${error.message}`, true);
+                    showStatus(`Error deleting list: ${error.message}`, 'error');
                 } else {
                     showStatus('List deleted successfully!');
                     loadLists();
                 }
             } catch (error) {
-                showStatus('Connection error', true);
+                showStatus('Connection error', 'error');
                 console.error('Error:', error);
             }
         }
 
         // Initialize app
         window.onload = function() {
-            loadLists();
+            loadSettings();
         };
 
-        // Close modal when clicking outside
+        // Close modals when clicking outside
         window.onclick = function(event) {
-            const modal = document.getElementById('createModal');
-            if (event.target === modal) {
+            const createModal = document.getElementById('createModal');
+            const settingsModal = document.getElementById('settingsModal');
+            
+            if (event.target === createModal) {
                 closeCreateModal();
+            }
+            if (event.target === settingsModal) {
+                closeSettingsModal();
             }
         };
     </script>
