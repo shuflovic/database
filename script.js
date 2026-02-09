@@ -2,7 +2,7 @@
 let supabaseClient = null;
 let tables = [];
 let currentEditRow = null;
-let currentEditTableId = null;
+let currentEditTable = null;
 
 // Load settings from localStorage
 function loadSettings() {
@@ -134,10 +134,10 @@ async function createTable() {
         return;
     }
 
-    const tableName = document.getElementById('tableName').value.trim();
+    const tableName = document.getElementById('tableName').value.trim().toLowerCase().replace(/\s+/g, '_');
     const columnInputs = document.querySelectorAll('.columns-input');
     const columns = Array.from(columnInputs)
-        .map(input => input.value.trim())
+        .map(input => input.value.trim().toLowerCase().replace(/\s+/g, '_'))
         .filter(col => col !== '');
 
     if (!tableName) {
@@ -150,17 +150,40 @@ async function createTable() {
         return;
     }
 
+    // Validate table name
+    if (!/^[a-z][a-z0-9_]*$/.test(tableName)) {
+        showStatus('Table name must start with a letter and contain only lowercase letters, numbers, and underscores', 'error');
+        return;
+    }
+
+    // Validate column names
+    for (const col of columns) {
+        if (!/^[a-z][a-z0-9_]*$/.test(col)) {
+            showStatus(`Column "${col}" is invalid. Use only lowercase letters, numbers, and underscores`, 'error');
+            return;
+        }
+    }
+
     try {
-        const { data, error } = await supabaseClient
-            .from('tables')
-            .insert([{
-                name: tableName,
-                columns: columns
-            }])
-            .select();
+        // Build CREATE TABLE SQL
+        const columnDefs = columns.map(col => `${col} TEXT`).join(', ');
+        const sql = `
+            CREATE TABLE ${tableName} (
+                id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+                ${columnDefs},
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW())
+            );
+        `;
+
+        const { error } = await supabaseClient.rpc('execute_sql', { sql_query: sql });
 
         if (error) {
-            showStatus(`Error creating table: ${error.message}`, 'error');
+            if (error.message.includes('function') && error.message.includes('does not exist')) {
+                showStatus('Please create the execute_sql function. See README.', 'error');
+                alert(`You need to create the execute_sql function in Supabase:\n\nCREATE OR REPLACE FUNCTION execute_sql(sql_query text)\nRETURNS void AS $$\nBEGIN\n  EXECUTE sql_query;\nEND;\n$$ LANGUAGE plpgsql SECURITY DEFINER;`);
+            } else {
+                showStatus(`Error creating table: ${error.message}`, 'error');
+            }
         } else {
             showStatus(`Table "${tableName}" created successfully!`);
             closeCreateModal();
@@ -172,19 +195,54 @@ async function createTable() {
     }
 }
 
-// Load all tables
+// Load all tables from Supabase
 async function loadTables() {
     if (!supabaseClient) {
         return;
     }
 
     try {
-        const { data, error } = await supabaseClient
-            .from('tables')
-            .select('*')
-            .order('created_at', { ascending: true });
+        // Query the information_schema to get all user tables
+        const { data, error } = await supabaseClient.rpc('get_user_tables');
 
         if (error) {
+            // If the function doesn't exist, show instructions
+            if (error.message.includes('function') && error.message.includes('does not exist')) {
+                showStatus('Please set up the database function. See README for instructions.', 'warning');
+                document.getElementById('tablesContainer').innerHTML = `
+                    <div class="setup-required">
+                        <h2>Database Setup Required</h2>
+                        <p>You need to create a function in Supabase to list tables.</p>
+                        <p>Go to Supabase SQL Editor and run:</p>
+                        <pre style="text-align: left; background: #f5f5f5; padding: 15px; border-radius: 4px; overflow-x: auto;">
+CREATE OR REPLACE FUNCTION get_user_tables()
+RETURNS TABLE(table_name text, columns jsonb) AS $$
+BEGIN
+  RETURN QUERY
+  SELECT 
+    t.table_name::text,
+    jsonb_agg(
+      jsonb_build_object(
+        'column_name', c.column_name,
+        'data_type', c.data_type
+      ) ORDER BY c.ordinal_position
+    ) as columns
+  FROM information_schema.tables t
+  LEFT JOIN information_schema.columns c 
+    ON t.table_name = c.table_name 
+    AND t.table_schema = c.table_schema
+  WHERE t.table_schema = 'public'
+    AND t.table_type = 'BASE TABLE'
+    AND t.table_name NOT IN ('tables', 'table_rows')
+  GROUP BY t.table_name
+  ORDER BY t.table_name;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;</pre>
+                        <button class="submit-btn" onclick="loadTables()" style="margin-top: 20px;">Retry After Setup</button>
+                    </div>
+                `;
+                return;
+            }
             showStatus(`Error loading tables: ${error.message}`, 'error');
             return;
         }
@@ -202,7 +260,7 @@ function renderTables() {
     const container = document.getElementById('tablesContainer');
     
     if (tables.length === 0) {
-        container.innerHTML = '<div class="no-tables">No tables created yet. Click "Create New Table" to get started!</div>';
+        container.innerHTML = '<div class="no-tables">No tables found. Click "Create New Table" to get started!</div>';
         return;
     }
 
@@ -210,7 +268,7 @@ function renderTables() {
     tables.forEach(table => {
         const tableDiv = createTableElement(table);
         container.appendChild(tableDiv);
-        loadTableRows(table.id);
+        loadTableData(table.table_name);
     });
 }
 
@@ -218,24 +276,29 @@ function renderTables() {
 function createTableElement(table) {
     const tableDiv = document.createElement('div');
     tableDiv.className = 'table-container';
-    tableDiv.id = `table-${table.id}`;
+    tableDiv.id = `table-${table.table_name}`;
 
-    const formInputs = table.columns.map(col => 
+    // Extract column names (exclude id and created_at if they exist)
+    const columns = table.columns
+        .map(col => col.column_name)
+        .filter(name => name !== 'id' && name !== 'created_at');
+
+    const formInputs = columns.map(col => 
         `<input type="text" placeholder="${col}" data-column="${col}">`
     ).join('');
 
     tableDiv.innerHTML = `
         <div class="table-header">
-            <h2 class="table-title">${table.name}</h2>
-            <button class="delete-table-btn" onclick="deleteTable(${table.id})">Delete Table</button>
+            <h2 class="table-title">${table.table_name}</h2>
+            <button class="delete-table-btn" onclick="deleteTable('${table.table_name}')">Delete Table</button>
         </div>
         
         <div class="add-row-form">
             ${formInputs}
-            <button class="add-row-btn" onclick="addRow(${table.id})">Add Row</button>
+            <button class="add-row-btn" onclick="addRow('${table.table_name}')">Add Row</button>
         </div>
         
-        <div class="data-table-wrapper" id="table-data-${table.id}">
+        <div class="data-table-wrapper" id="table-data-${table.table_name}">
             Loading...
         </div>
     `;
@@ -245,7 +308,7 @@ function createTableElement(table) {
     inputs.forEach(input => {
         input.addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
-                addRow(table.id);
+                addRow(table.table_name);
             }
         });
     });
@@ -254,13 +317,13 @@ function createTableElement(table) {
 }
 
 // Add row to table
-async function addRow(tableId) {
+async function addRow(tableName) {
     if (!supabaseClient) {
         showStatus('Not connected to Supabase', 'error');
         return;
     }
 
-    const tableDiv = document.getElementById(`table-${tableId}`);
+    const tableDiv = document.getElementById(`table-${tableName}`);
     const inputs = tableDiv.querySelectorAll('.add-row-form input');
     
     const data = {};
@@ -281,17 +344,14 @@ async function addRow(tableId) {
 
     try {
         const { error } = await supabaseClient
-            .from('table_rows')
-            .insert([{
-                table_id: tableId,
-                data: data
-            }]);
+            .from(tableName)
+            .insert([data]);
 
         if (error) {
             showStatus(`Error adding row: ${error.message}`, 'error');
         } else {
             inputs.forEach(input => input.value = '');
-            loadTableRows(tableId);
+            loadTableData(tableName);
         }
     } catch (error) {
         showStatus('Connection error', 'error');
@@ -299,34 +359,35 @@ async function addRow(tableId) {
     }
 }
 
-// Load rows for a specific table
-async function loadTableRows(tableId) {
+// Load data for a specific table
+async function loadTableData(tableName) {
     if (!supabaseClient) {
         return;
     }
 
     try {
         const { data, error } = await supabaseClient
-            .from('table_rows')
+            .from(tableName)
             .select('*')
-            .eq('table_id', tableId)
             .order('created_at', { ascending: true });
 
         if (error) {
-            document.getElementById(`table-data-${tableId}`).innerHTML = '<div class="empty-table">Error loading rows</div>';
+            document.getElementById(`table-data-${tableName}`).innerHTML = '<div class="empty-table">Error loading data</div>';
             return;
         }
 
-        const tableContainer = document.getElementById(`table-data-${tableId}`);
+        const tableContainer = document.getElementById(`table-data-${tableName}`);
         
         if (!data || data.length === 0) {
             tableContainer.innerHTML = '<div class="empty-table">No rows yet. Add some data above!</div>';
             return;
         }
 
-        // Get table columns
-        const table = tables.find(t => t.id === tableId);
-        const columns = table.columns;
+        // Get table info
+        const table = tables.find(t => t.table_name === tableName);
+        const columns = table.columns
+            .map(col => col.column_name)
+            .filter(name => name !== 'id' && name !== 'created_at');
 
         // Create table HTML
         let tableHtml = '<table class="data-table"><thead><tr>';
@@ -341,41 +402,41 @@ async function loadTableRows(tableId) {
         data.forEach(row => {
             tableHtml += '<tr>';
             columns.forEach(col => {
-                const value = row.data[col] || '';
+                const value = row[col] || '';
                 tableHtml += `<td>${value}</td>`;
             });
             tableHtml += `<td>
-                <button class="action-btn" onclick="openEditModal(${row.id}, ${tableId})">Edit</button>
-                <button class="action-btn delete-btn" onclick="deleteRow(${row.id}, ${tableId})">Delete</button>
+                <button class="action-btn" onclick='openEditModal(${row.id}, "${tableName}")'>Edit</button>
+                <button class="action-btn delete-btn" onclick='deleteRow(${row.id}, "${tableName}")'>Delete</button>
             </td></tr>`;
         });
 
         tableHtml += '</tbody></table>';
         tableContainer.innerHTML = tableHtml;
     } catch (error) {
-        document.getElementById(`table-data-${tableId}`).innerHTML = '<div class="empty-table">Connection error</div>';
+        document.getElementById(`table-data-${tableName}`).innerHTML = '<div class="empty-table">Connection error</div>';
         console.error('Error:', error);
     }
 }
 
 // Edit Modal functions
-function openEditModal(rowId, tableId) {
+function openEditModal(rowId, tableName) {
     if (!supabaseClient) {
         showStatus('Not connected to Supabase', 'error');
         return;
     }
 
     currentEditRow = rowId;
-    currentEditTableId = tableId;
+    currentEditTable = tableName;
 
     // Load row data
-    loadRowForEdit(rowId, tableId);
+    loadRowForEdit(rowId, tableName);
 }
 
-async function loadRowForEdit(rowId, tableId) {
+async function loadRowForEdit(rowId, tableName) {
     try {
         const { data, error } = await supabaseClient
-            .from('table_rows')
+            .from(tableName)
             .select('*')
             .eq('id', rowId)
             .single();
@@ -385,13 +446,17 @@ async function loadRowForEdit(rowId, tableId) {
             return;
         }
 
-        const table = tables.find(t => t.id === tableId);
+        const table = tables.find(t => t.table_name === tableName);
+        const columns = table.columns
+            .map(col => col.column_name)
+            .filter(name => name !== 'id' && name !== 'created_at');
+        
         const formContainer = document.getElementById('editFormContainer');
         
         // Build edit form
         let formHtml = '';
-        table.columns.forEach(col => {
-            const value = data.data[col] || '';
+        columns.forEach(col => {
+            const value = data[col] || '';
             formHtml += `
                 <div class="form-group">
                     <label for="edit-${col}">${col}:</label>
@@ -411,11 +476,11 @@ async function loadRowForEdit(rowId, tableId) {
 function closeEditModal() {
     document.getElementById('editModal').style.display = 'none';
     currentEditRow = null;
-    currentEditTableId = null;
+    currentEditTable = null;
 }
 
 async function saveEdit() {
-    if (!supabaseClient || !currentEditRow) {
+    if (!supabaseClient || !currentEditRow || !currentEditTable) {
         showStatus('Not connected to Supabase', 'error');
         return;
     }
@@ -429,8 +494,8 @@ async function saveEdit() {
 
     try {
         const { error } = await supabaseClient
-            .from('table_rows')
-            .update({ data: data })
+            .from(currentEditTable)
+            .update(data)
             .eq('id', currentEditRow);
 
         if (error) {
@@ -438,7 +503,7 @@ async function saveEdit() {
         } else {
             showStatus('Row updated successfully!');
             closeEditModal();
-            loadTableRows(currentEditTableId);
+            loadTableData(currentEditTable);
         }
     } catch (error) {
         showStatus('Connection error', 'error');
@@ -447,7 +512,7 @@ async function saveEdit() {
 }
 
 // Delete row
-async function deleteRow(rowId, tableId) {
+async function deleteRow(rowId, tableName) {
     if (!supabaseClient) {
         showStatus('Not connected to Supabase', 'error');
         return;
@@ -459,7 +524,7 @@ async function deleteRow(rowId, tableId) {
 
     try {
         const { error } = await supabaseClient
-            .from('table_rows')
+            .from(tableName)
             .delete()
             .eq('id', rowId);
 
@@ -467,7 +532,7 @@ async function deleteRow(rowId, tableId) {
             showStatus(`Error deleting row: ${error.message}`, 'error');
         } else {
             showStatus('Row deleted successfully!');
-            loadTableRows(tableId);
+            loadTableData(tableName);
         }
     } catch (error) {
         showStatus('Connection error', 'error');
@@ -476,28 +541,19 @@ async function deleteRow(rowId, tableId) {
 }
 
 // Delete table
-async function deleteTable(tableId) {
+async function deleteTable(tableName) {
     if (!supabaseClient) {
         showStatus('Not connected to Supabase', 'error');
         return;
     }
 
-    if (!confirm('Are you sure you want to delete this table and all its rows?')) {
+    if (!confirm(`Are you sure you want to DELETE the entire table "${tableName}" and all its data? This cannot be undone!`)) {
         return;
     }
 
     try {
-        // Delete rows first
-        await supabaseClient
-            .from('table_rows')
-            .delete()
-            .eq('table_id', tableId);
-
-        // Delete table
-        const { error } = await supabaseClient
-            .from('tables')
-            .delete()
-            .eq('id', tableId);
+        const sql = `DROP TABLE IF EXISTS ${tableName};`;
+        const { error } = await supabaseClient.rpc('execute_sql', { sql_query: sql });
 
         if (error) {
             showStatus(`Error deleting table: ${error.message}`, 'error');
