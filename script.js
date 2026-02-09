@@ -216,27 +216,27 @@ async function loadTables() {
                         <p>Go to Supabase SQL Editor and run:</p>
                         <pre style="text-align: left; background: #f5f5f5; padding: 15px; border-radius: 4px; overflow-x: auto;">
 CREATE OR REPLACE FUNCTION get_user_tables()
-RETURNS TABLE(table_name text, columns jsonb) AS $$
+RETURNS TABLE(table_name text, columns jsonb) AS $$    
 BEGIN
   RETURN QUERY
-SELECT
-  t.table_name::text,
-  jsonb_agg(
-    jsonb_build_object(
-      'column_name', c.column_name,
-      'data_type', c.data_type
-    ) ORDER BY c.ordinal_position
-  ) as columns
-FROM information_schema.tables t
-LEFT JOIN information_schema.columns c
-  ON t.table_name = c.table_name
-  AND t.table_schema = c.table_schema
-WHERE t.table_schema = 'public'
-  AND t.table_type = 'BASE TABLE'
-GROUP BY t.table_name
-ORDER BY t.table_name;
-end;
-$$ LANGUAGE plpgsql SECURITY DEFINER;</pre>
+  SELECT
+    t.table_name::text,
+    jsonb_agg(
+      jsonb_build_object(
+        'column_name', c.column_name,
+        'data_type', c.data_type
+      ) ORDER BY c.ordinal_position
+    ) as columns
+  FROM information_schema.tables t
+  LEFT JOIN information_schema.columns c
+    ON t.table_name = c.table_name
+    AND t.table_schema = c.table_schema
+  WHERE t.table_schema = 'public'
+    AND t.table_type = 'BASE TABLE'
+  GROUP BY t.table_name
+  ORDER BY t.table_name;
+END;
+    $$ LANGUAGE plpgsql SECURITY DEFINER;</pre>
                         <button class="submit-btn" onclick="loadTables()" style="margin-top: 20px;">Retry After Setup</button>
                     </div>
                 `;
