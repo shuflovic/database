@@ -4,6 +4,22 @@ let tables = [];
 let currentEditRow = null;
 let currentEditTable = null;
 
+// script.js
+
+const toggleBtn = document.getElementById('dark-mode-toggle');
+
+// Load saved preference (if any) when the page starts
+const savedPreference = localStorage.getItem('darkMode');
+if (savedPreference === 'true') {
+  document.body.classList.add('dark-mode');
+}
+
+// Click handler – toggle the class and store the new state
+toggleBtn.addEventListener('click', () => {
+  const isDark = document.body.classList.toggle('dark-mode');
+  localStorage.setItem('darkMode', isDark); // persist across reloads
+});
+
 // Load settings from localStorage
 function loadSettings() {
     const url = localStorage.getItem('supabase_url');
