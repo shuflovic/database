@@ -81,16 +81,56 @@
     </div>
 
     <!-- Edit Row Modal -->
-    <div id="editModal" class="modal">
+    <div id="editRowModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
                 <h2>Edit Row</h2>
-                <span class="close" onclick="closeEditModal()">&times;</span>
+                <span class="close" onclick="closeEditRowModal()">&times;</span>
             </div>
             
             <div id="editFormContainer"></div>
             
             <button class="submit-btn" onclick="saveEdit()">Save Changes</button>
+        </div>
+    </div>
+
+    <!-- Table Management Modal -->
+    <div id="tableManagementModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="tableManagementTitle">Manage Table</h2>
+                <span class="close" onclick="closeTableManagementModal()">&times;</span>
+            </div>
+            
+            <div class="management-options">
+                <div class="management-section">
+                    <h3>Add Row</h3>
+                    <div id="addRowFormContainer"></div>
+                </div>
+
+                <div class="management-section">
+                    <h3>Add Column</h3>
+                    <div class="form-group">
+                        <input type="text" id="newColumnName" placeholder="New column name">
+                        <button class="submit-btn" onclick="addColumn()" style="margin-top: 10px;">Add Column</button>
+                    </div>
+                </div>
+
+                <div class="management-section">
+                    <h3>Delete Column</h3>
+                    <div class="form-group">
+                        <select id="deleteColumnSelect" class="form-select">
+                            <option value="">Select column to delete</option>
+                        </select>
+                        <button class="delete-btn-full" onclick="deleteColumn()" style="margin-top: 10px;">Delete Column</button>
+                    </div>
+                </div>
+
+                <div class="management-section danger-zone">
+                    <h3>Danger Zone</h3>
+                    <button class="delete-btn-full" onclick="deleteTableFromManagement()">Delete Entire Table</button>
+                </div>
+            </div>
         </div>
     </div>
 
