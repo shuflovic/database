@@ -3,6 +3,7 @@ let supabaseClient = null;
 let tables = [];
 let currentEditRow = null;
 let currentEditTable = null;
+let currentManagementTable = null;
 
 // script.js
 
@@ -293,24 +294,10 @@ function createTableElement(table) {
     tableDiv.className = 'table-container';
     tableDiv.id = `table-${table.table_name}`;
 
-    // Extract column names (exclude id and created_at if they exist)
-    const columns = table.columns
-        .map(col => col.column_name)
-        .filter(name => name !== 'id' && name !== 'created_at');
-
-    const formInputs = columns.map(col => 
-        `<input type="text" placeholder="${col}" data-column="${col}">`
-    ).join('');
-
     tableDiv.innerHTML = `
         <div class="table-header">
             <h2 class="table-title">${table.table_name}</h2>
-            <button class="delete-table-btn" onclick="deleteTable('${table.table_name}')">Delete Table</button>
-        </div>
-        
-        <div class="add-row-form">
-            ${formInputs}
-            <button class="add-row-btn" onclick="addRow('${table.table_name}')">Add Row</button>
+            <button class="edit-table-btn" onclick="openTableManagementModal('${table.table_name}')">Edit</button>
         </div>
         
         <div class="data-table-wrapper" id="table-data-${table.table_name}">
@@ -318,29 +305,60 @@ function createTableElement(table) {
         </div>
     `;
 
-    // Add Enter key functionality to inputs
-    const inputs = tableDiv.querySelectorAll('input');
-    inputs.forEach(input => {
-        input.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                addRow(table.table_name);
-            }
-        });
-    });
-
     return tableDiv;
 }
 
-// Add row to table
-async function addRow(tableName) {
+// Table Management Modal
+function openTableManagementModal(tableName) {
     if (!supabaseClient) {
         showStatus('Not connected to Supabase', 'error');
         return;
     }
 
-    const tableDiv = document.getElementById(`table-${tableName}`);
-    const inputs = tableDiv.querySelectorAll('.add-row-form input');
+    currentManagementTable = tableName;
+    document.getElementById('tableManagementTitle').textContent = `Manage Table: ${tableName}`;
     
+    // Get table structure
+    const table = tables.find(t => t.table_name === tableName);
+    const columns = table.columns
+        .map(col => col.column_name)
+        .filter(name => name !== 'id' && name !== 'created_at');
+
+    // Build add row form
+    const addRowContainer = document.getElementById('addRowFormContainer');
+    let formHtml = '<div class="add-row-inline">';
+    columns.forEach(col => {
+        formHtml += `<input type="text" placeholder="${col}" data-column="${col}" class="inline-input">`;
+    });
+    formHtml += '<button class="submit-btn" onclick="addRowFromManagement()" style="margin-top: 10px;">Add Row</button></div>';
+    addRowContainer.innerHTML = formHtml;
+
+    // Build delete column dropdown
+    const deleteColumnSelect = document.getElementById('deleteColumnSelect');
+    deleteColumnSelect.innerHTML = '<option value="">Select column to delete</option>';
+    columns.forEach(col => {
+        const option = document.createElement('option');
+        option.value = col;
+        option.textContent = col;
+        deleteColumnSelect.appendChild(option);
+    });
+
+    document.getElementById('tableManagementModal').style.display = 'block';
+}
+
+function closeTableManagementModal() {
+    document.getElementById('tableManagementModal').style.display = 'none';
+    currentManagementTable = null;
+}
+
+// Add row from management modal
+async function addRowFromManagement() {
+    if (!supabaseClient || !currentManagementTable) {
+        showStatus('Not connected to Supabase', 'error');
+        return;
+    }
+
+    const inputs = document.querySelectorAll('#addRowFormContainer input');
     const data = {};
     let hasData = false;
     
@@ -359,14 +377,115 @@ async function addRow(tableName) {
 
     try {
         const { error } = await supabaseClient
-            .from(tableName)
+            .from(currentManagementTable)
             .insert([data]);
 
         if (error) {
             showStatus(`Error adding row: ${error.message}`, 'error');
         } else {
+            showStatus('Row added successfully!');
             inputs.forEach(input => input.value = '');
-            loadTableData(tableName);
+            loadTableData(currentManagementTable);
+        }
+    } catch (error) {
+        showStatus('Connection error', 'error');
+        console.error('Error:', error);
+    }
+}
+
+// Add column
+async function addColumn() {
+    if (!supabaseClient || !currentManagementTable) {
+        showStatus('Not connected to Supabase', 'error');
+        return;
+    }
+
+    const columnName = document.getElementById('newColumnName').value.trim().toLowerCase().replace(/\s+/g, '_');
+    
+    if (!columnName) {
+        showStatus('Please enter a column name', 'error');
+        return;
+    }
+
+    if (!/^[a-z][a-z0-9_]*$/.test(columnName)) {
+        showStatus('Column name must start with a letter and contain only lowercase letters, numbers, and underscores', 'error');
+        return;
+    }
+
+    try {
+        const sql = `ALTER TABLE ${currentManagementTable} ADD COLUMN ${columnName} TEXT;`;
+        const { error } = await supabaseClient.rpc('execute_sql', { sql_query: sql });
+
+        if (error) {
+            showStatus(`Error adding column: ${error.message}`, 'error');
+        } else {
+            showStatus('Column added successfully!');
+            document.getElementById('newColumnName').value = '';
+            closeTableManagementModal();
+            loadTables();
+        }
+    } catch (error) {
+        showStatus('Connection error', 'error');
+        console.error('Error:', error);
+    }
+}
+
+// Delete column
+async function deleteColumn() {
+    if (!supabaseClient || !currentManagementTable) {
+        showStatus('Not connected to Supabase', 'error');
+        return;
+    }
+
+    const columnName = document.getElementById('deleteColumnSelect').value;
+    
+    if (!columnName) {
+        showStatus('Please select a column to delete', 'error');
+        return;
+    }
+
+    if (!confirm(`Are you sure you want to delete the column "${columnName}"? This will permanently remove all data in this column!`)) {
+        return;
+    }
+
+    try {
+        const sql = `ALTER TABLE ${currentManagementTable} DROP COLUMN ${columnName};`;
+        const { error } = await supabaseClient.rpc('execute_sql', { sql_query: sql });
+
+        if (error) {
+            showStatus(`Error deleting column: ${error.message}`, 'error');
+        } else {
+            showStatus('Column deleted successfully!');
+            closeTableManagementModal();
+            loadTables();
+        }
+    } catch (error) {
+        showStatus('Connection error', 'error');
+        console.error('Error:', error);
+    }
+}
+
+// Delete table from management modal
+async function deleteTableFromManagement() {
+    if (!supabaseClient || !currentManagementTable) {
+        showStatus('Not connected to Supabase', 'error');
+        return;
+    }
+
+    if (!confirm(`Are you sure you want to DELETE the entire table "${currentManagementTable}" and all its data? This cannot be undone!`)) {
+        return;
+    }
+
+    try {
+        const sql = `DROP TABLE IF EXISTS ${currentManagementTable};`;
+        const { error } = await supabaseClient.rpc('execute_sql', { sql_query: sql });
+
+        if (error) {
+            showStatus(`Error deleting table: ${error.message}`, 'error');
+        } else {
+            showStatus('Table deleted successfully!');
+            closeTableManagementModal();
+            loadTables();
         }
     } catch (error) {
         showStatus('Connection error', 'error');
@@ -406,7 +525,7 @@ async function loadTableData(tableName, limit = 10) {
         const tableContainer = document.getElementById(`table-data-${tableName}`);
 
         if (!data || data.length === 0) {
-            tableContainer.innerHTML = '<div class="empty-table">No rows yet. Add some data above!</div>';
+            tableContainer.innerHTML = '<div class="empty-table">No rows yet. Click "Edit" to add data!</div>';
             return;
         }
 
@@ -430,7 +549,7 @@ async function loadTableData(tableName, limit = 10) {
                 tableHtml += `<td>${value}</td>`;
             });
             tableHtml += `<td>
-                <button class="action-btn" onclick="openEditModal(${row.id}, '${tableName}')">Edit</button>
+                <button class="action-btn" onclick="openEditRowModal(${row.id}, '${tableName}')">Edit</button>
                 <button class="action-btn delete-btn" onclick="deleteRow(${row.id}, '${tableName}')">Delete</button>
             </td></tr>`;
         });
@@ -454,8 +573,9 @@ async function loadTableData(tableName, limit = 10) {
         console.error('Error:', error);
     }
 }
-// Edit Modal functions
-function openEditModal(rowId, tableName) {
+
+// Edit Row Modal functions
+function openEditRowModal(rowId, tableName) {
     if (!supabaseClient) {
         showStatus('Not connected to Supabase', 'error');
         return;
@@ -501,15 +621,15 @@ async function loadRowForEdit(rowId, tableName) {
         });
 
         formContainer.innerHTML = formHtml;
-        document.getElementById('editModal').style.display = 'block';
+        document.getElementById('editRowModal').style.display = 'block';
     } catch (error) {
         showStatus('Connection error', 'error');
         console.error('Error:', error);
     }
 }
 
-function closeEditModal() {
-    document.getElementById('editModal').style.display = 'none';
+function closeEditRowModal() {
+    document.getElementById('editRowModal').style.display = 'none';
     currentEditRow = null;
     currentEditTable = null;
 }
@@ -537,7 +657,7 @@ async function saveEdit() {
             showStatus(`Error updating row: ${error.message}`, 'error');
         } else {
             showStatus('Row updated successfully!');
-            closeEditModal();
+            closeEditRowModal();
             loadTableData(currentEditTable);
         }
     } catch (error) {
@@ -575,33 +695,6 @@ async function deleteRow(rowId, tableName) {
     }
 }
 
-// Delete table
-async function deleteTable(tableName) {
-    if (!supabaseClient) {
-        showStatus('Not connected to Supabase', 'error');
-        return;
-    }
-
-    if (!confirm(`Are you sure you want to DELETE the entire table "${tableName}" and all its data? This cannot be undone!`)) {
-        return;
-    }
-
-    try {
-        const sql = `DROP TABLE IF EXISTS ${tableName};`;
-        const { error } = await supabaseClient.rpc('execute_sql', { sql_query: sql });
-
-        if (error) {
-            showStatus(`Error deleting table: ${error.message}`, 'error');
-        } else {
-            showStatus('Table deleted successfully!');
-            loadTables();
-        }
-    } catch (error) {
-        showStatus('Connection error', 'error');
-        console.error('Error:', error);
-    }
-}
-
 // Initialize app
 window.onload = function() {
     loadSettings();
@@ -611,7 +704,8 @@ window.onload = function() {
 window.onclick = function(event) {
     const createModal = document.getElementById('createModal');
     const settingsModal = document.getElementById('settingsModal');
-    const editModal = document.getElementById('editModal');
+    const editRowModal = document.getElementById('editRowModal');
+    const tableManagementModal = document.getElementById('tableManagementModal');
     
     if (event.target === createModal) {
         closeCreateModal();
@@ -619,7 +713,10 @@ window.onclick = function(event) {
     if (event.target === settingsModal) {
         closeSettingsModal();
     }
-    if (event.target === editModal) {
-        closeEditModal();
+    if (event.target === editRowModal) {
+        closeEditRowModal();
+    }
+    if (event.target === tableManagementModal) {
+        closeTableManagementModal();
     }
 };
