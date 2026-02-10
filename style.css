@@ -4,22 +4,116 @@ body {
     margin: 20px auto;
     padding: 20px;
     background-color: #f5f5f5;
+    color: #333;
+    transition: background-color 0.3s ease, color 0.3s ease;
 }
 
-/* Dark theme – applied when the `dark-mode` class is on <body> */
-body {
-  background-color: #f0f0f0;
-  color: #000;
-  transition: background-color 0.3s ease, color 0.3s ease;
+/* Dark mode styles */
+body.dark-mode {
+    background-color: #1a1a1a;
+    color: #e0e0e0;
 }
 
-/* Position the toggle button */
+body.dark-mode .header {
+    background: #2d2d2d;
+    color: #e0e0e0;
+}
+
+body.dark-mode .table-container {
+    background: #2d2d2d;
+    color: #e0e0e0;
+}
+
+body.dark-mode .modal-content {
+    background-color: #2d2d2d;
+    color: #e0e0e0;
+}
+
+body.dark-mode .form-group input,
+body.dark-mode .form-group textarea {
+    background-color: #1a1a1a;
+    color: #e0e0e0;
+    border-color: #444;
+}
+
+body.dark-mode .data-table td {
+    border-bottom-color: #444;
+}
+
+body.dark-mode .data-table tr:hover {
+    background-color: #3a3a3a;
+}
+
+body.dark-mode .data-table td:hover {
+    background: #3a3a3a;
+}
+
+body.dark-mode .setup-required {
+    background: #2d2d2d;
+    color: #e0e0e0;
+}
+
+body.dark-mode .add-row-form input {
+    background-color: #1a1a1a;
+    color: #e0e0e0;
+    border-color: #444;
+}
+
+body.dark-mode .empty-table {
+    background-color: #1a1a1a;
+    color: #999;
+}
+
+body.dark-mode .no-tables {
+    color: #999;
+}
+
+body.dark-mode .close {
+    color: #999;
+}
+
+body.dark-mode .close:hover {
+    color: #e0e0e0;
+}
+
+/* Dark mode toggle button */
 #dark-mode-toggle {
-  position: fixed;
-  top: 1rem;
-  right: 1rem;
-  padding: 0.5rem 1rem;
-  cursor: pointer;
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    padding: 10px 20px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    border-radius: 25px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    transition: all 0.3s ease;
+    z-index: 1001;
+}
+
+#dark-mode-toggle:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+}
+
+#dark-mode-toggle:active {
+    transform: translateY(0);
+}
+
+body.dark-mode #dark-mode-toggle {
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+}
+
+#dark-mode-toggle::before {
+    content: '🌙';
+    margin-right: 8px;
+}
+
+body.dark-mode #dark-mode-toggle::before {
+    content: '☀️';
 }
 
 .header {
