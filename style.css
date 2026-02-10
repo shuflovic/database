@@ -464,9 +464,9 @@ body.dark-mode .submit-btn:hover {
     font-weight: 600;
 }
 
-.delete-table-btn {
+.edit-table-btn {
     background-color: #ffffff;
-    color: #cf222e;
+    color: #24292f;
     padding: 6px 12px;
     border: 1px solid #d0d7de;
     border-radius: 6px;
@@ -476,19 +476,132 @@ body.dark-mode .submit-btn:hover {
     transition: all 0.2s ease;
 }
 
-.delete-table-btn:hover {
+.edit-table-btn:hover {
+    background-color: #f6f8fa;
+    border-color: #8b949e;
+}
+
+body.dark-mode .edit-table-btn {
+    background-color: #21262d;
+    color: #c9d1d9;
+    border-color: #30363d;
+}
+
+body.dark-mode .edit-table-btn:hover {
+    background-color: #30363d;
+    border-color: #484f58;
+}
+
+/* Management Modal Styles */
+.management-options {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+.management-section {
+    padding: 20px;
+    border: 1px solid #d0d7de;
+    border-radius: 6px;
+    background-color: #f6f8fa;
+}
+
+body.dark-mode .management-section {
+    background-color: #0d1117;
+    border-color: #30363d;
+}
+
+.management-section h3 {
+    margin: 0 0 16px 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: #24292f;
+}
+
+body.dark-mode .management-section h3 {
+    color: #c9d1d9;
+}
+
+.management-section.danger-zone {
+    background-color: #fff8f8;
+    border-color: #ffcdd2;
+}
+
+body.dark-mode .management-section.danger-zone {
+    background-color: #1a0d0d;
+    border-color: #5a1f1f;
+}
+
+.management-section.danger-zone h3 {
+    color: #cf222e;
+}
+
+body.dark-mode .management-section.danger-zone h3 {
+    color: #ff7b72;
+}
+
+.add-row-inline {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.inline-input {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #d0d7de;
+    border-radius: 6px;
+    font-size: 14px;
+}
+
+body.dark-mode .inline-input {
+    background-color: #0d1117;
+    color: #c9d1d9;
+    border-color: #30363d;
+}
+
+.form-select {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #d0d7de;
+    border-radius: 6px;
+    font-size: 14px;
+    background-color: #ffffff;
+    color: #24292f;
+}
+
+body.dark-mode .form-select {
+    background-color: #0d1117;
+    color: #c9d1d9;
+    border-color: #30363d;
+}
+
+.delete-btn-full {
+    background-color: #ffffff;
+    color: #cf222e;
+    padding: 10px 20px;
+    border: 1px solid #d0d7de;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    width: 100%;
+    transition: all 0.2s ease;
+}
+
+.delete-btn-full:hover {
     background-color: #cf222e;
     color: #ffffff;
     border-color: #cf222e;
 }
 
-body.dark-mode .delete-table-btn {
+body.dark-mode .delete-btn-full {
     background-color: #21262d;
     color: #ff7b72;
     border-color: #30363d;
 }
 
-body.dark-mode .delete-table-btn:hover {
+body.dark-mode .delete-btn-full:hover {
     background-color: #a40e26;
     color: #ffffff;
     border-color: #a40e26;
