@@ -44,8 +44,9 @@ body.dark-mode .form-group textarea:focus {
 }
 
 body.dark-mode .data-table th {
-    background-color: #161b22;
-    border-color: #30363d;
+    background-color: #0e448f;
+    border-color: #e9ecef;
+    color: #c9d1d9;
 }
 
 body.dark-mode .data-table td {
@@ -413,6 +414,11 @@ body.dark-mode .submit-btn:hover {
     border-color: #2ea043;
 }
 
+/* Submit button in management section needs margin-top */
+.management-section .form-group .submit-btn {
+    margin-top: 10px;
+}
+
 /* ─────────────────────────────────────────────── */
 /*          MAIN TABLES GRID & SCROLLABLE CARDS      */
 /* ─────────────────────────────────────────────── */
@@ -586,6 +592,7 @@ body.dark-mode .form-select {
     font-size: 14px;
     font-weight: 500;
     width: 100%;
+    margin-top: 10px;
     transition: all 0.2s ease;
 }
 
@@ -904,4 +911,38 @@ body.dark-mode .disconnected {
     background-color: #f6f8fa;
     border-radius: 6px;
     font-size: 14px;
+}
+
+/* Custom Scrollbar Styles */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: #f6f8fa;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #d0d7de;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #8b949e;
+}
+
+body.dark-mode ::-webkit-scrollbar-track {
+    background: #0d1117;
+    border-radius: 4px;
+}
+
+body.dark-mode ::-webkit-scrollbar-thumb {
+    background: #30363d;
+    border-radius: 4px;
+}
+
+body.dark-mode ::-webkit-scrollbar-thumb:hover {
+    background: #484f58;
 }
