@@ -6,6 +6,7 @@ let currentEditTable = null;
 let currentManagementTable = null;
 let uploadedData = null;
 let uploadedFileName = null;
+let uploadedSheetsData = null;
 
 // script.js
 
@@ -240,18 +241,14 @@ async function handleFileUpload(event) {
     }
     
     try {
-        const data = await readFile(file);
-        uploadedData = data;
+        const result = await readFile(file);
+        uploadedSheetsData = result;
         uploadedFileName = file.name;
         
-        // Show upload modal
-        document.getElementById('uploadFileInfo').textContent = `Selected: ${file.name} (${data.length} rows)`;
-        document.getElementById('uploadTableName').value = generateTableName(file.name);
+        // Show sheet selection modal
+        showSheetSelection(result);
         
-        // Show preview
-        showUploadPreview(data);
-        
-        document.getElementById('uploadModal').style.display = 'block';
+        document.getElementById('sheetSelectModal').style.display = 'block';
     } catch (error) {
         showStatus('Error reading file: ' + error.message, 'error');
         console.error('Error reading file:', error);
@@ -260,7 +257,208 @@ async function handleFileUpload(event) {
     event.target.value = '';
 }
 
-// Read file using SheetJS
+// Show sheet selection modal
+function showSheetSelection(result) {
+    const modal = document.getElementById('sheetSelectModal');
+    const info = document.getElementById('sheetSelectFileInfo');
+    const list = document.getElementById('sheetList');
+    
+    info.textContent = 'File: ' + result.fileName + ' (' + result.totalSheets + ' sheets with data)';
+    
+    let html = '';
+    result.sheetNames.forEach(sheetName => {
+        const sheet = result.sheets[sheetName];
+        html += '<div class="sheet-item">' +
+            '<input type="checkbox" id="sheet_' + sheetName + '" checked onchange="updateSelectedCount()">' +
+            '<label for="sheet_' + sheetName + '">' +
+            '<strong>' + sheet.name + '</strong> (' + sheet.rowCount + ' rows, ' + sheet.headers.length + ' columns)' +
+            '</label>' +
+            '<input type="text" id="table_' + sheetName + '" value="' + generateTableNameFromSheet(sheetName) + '" ' +
+            'placeholder="Table name" class="sheet-table-name" onchange="validateTableName(this)">' +
+            '<button type="button" class="preview-sheet-btn" onclick="previewSheet(\'' + sheetName + '\')">Preview</button>' +
+            '</div>';
+    });
+    
+    list.innerHTML = html;
+    updateSelectedCount();
+}
+
+// Update selected sheet count
+function updateSelectedCount() {
+    const checkboxes = document.querySelectorAll('#sheetList input[type="checkbox"]');
+    const selected = Array.from(checkboxes).filter(cb => cb.checked).length;
+    const countEl = document.getElementById('selectedSheetCount');
+    if (countEl) {
+        countEl.textContent = selected + ' sheet(s) selected';
+    }
+}
+
+// Preview a single sheet
+function previewSheet(sheetName) {
+    if (!uploadedSheetsData || !uploadedSheetsData.sheets[sheetName]) return;
+    
+    const sheet = uploadedSheetsData.sheets[sheetName];
+    const preview = document.getElementById('sheetPreview');
+    const previewTitle = document.getElementById('sheetPreviewTitle');
+    
+    previewTitle.textContent = 'Preview: ' + sheet.name;
+    
+    const previewRows = sheet.data.slice(0, 5);
+    
+    let html = '<table style="width: 100%; border-collapse: collapse;">' +
+        '<thead><tr>';
+    
+    sheet.headers.forEach(header => {
+        html += '<th style="border: 1px solid #ddd; padding: 8px; background: #f5f5f5;">' + header + '</th>';
+    });
+    
+    html += '</tr></thead><tbody>';
+    
+    previewRows.forEach(row => {
+        html += '<tr>';
+        sheet.headers.forEach(header => {
+            const value = row[header] !== null ? row[header] : '';
+            html += '<td style="border: 1px solid #ddd; padding: 8px;">' + value + '</td>';
+        });
+        html += '</tr>';
+    });
+    
+    if (sheet.data.length > 5) {
+        html += '<tr><td colspan="' + sheet.headers.length + '" style="text-align: center; padding: 8px; color: #666;">... and ' + (sheet.data.length - 5) + ' more rows</td></tr>';
+    }
+    
+    html += '</tbody></table>';
+    preview.innerHTML = html;
+    
+    document.getElementById('sheetPreviewModal').style.display = 'block';
+}
+
+// Validate table name
+function validateTableName(input) {
+    const value = input.value.trim().toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+    if (!/^[a-z]/.test(value)) {
+        input.value = 't_' + value;
+    }
+}
+
+// Close sheet selection modal
+function closeSheetSelectModal() {
+    document.getElementById('sheetSelectModal').style.display = 'none';
+    uploadedSheetsData = null;
+}
+
+// Close sheet preview modal
+function closeSheetPreviewModal() {
+    document.getElementById('sheetPreviewModal').style.display = 'none';
+}
+
+// Import selected sheets
+async function importSelectedSheets() {
+    if (!uploadedSheetsData) {
+        showStatus('No data to import', 'error');
+        return;
+    }
+    
+    const checkboxes = document.querySelectorAll('#sheetList input[type="checkbox"]:checked');
+    if (checkboxes.length === 0) {
+        showStatus('Please select at least one sheet', 'error');
+        return;
+    }
+    
+    const tablesToCreate = [];
+    
+    checkboxes.forEach(cb => {
+        const sheetName = cb.id.replace('sheet_', '');
+        const tableName = document.getElementById('table_' + sheetName).value.trim().toLowerCase().replace(/\s+/g, '_');
+        
+        if (!tableName) {
+            showStatus('Please enter a table name for sheet: ' + sheetName, 'error');
+            return;
+        }
+        
+        if (!/^[a-z][a-z0-9_]*$/.test(tableName)) {
+            showStatus('Invalid table name: ' + tableName + ' (must start with letter, only lowercase letters, numbers, underscores)', 'error');
+            return;
+        }
+        
+        tablesToCreate.push({
+            sheetName: sheetName,
+            tableName: tableName,
+            data: uploadedSheetsData.sheets[sheetName].data,
+            headers: uploadedSheetsData.sheets[sheetName].headers
+        });
+    });
+    
+    if (tablesToCreate.length === 0) return;
+    
+    try {
+        showStatus('Creating ' + tablesToCreate.length + ' table(s)...', 'info');
+        
+        let totalRows = 0;
+        
+        for (const tableInfo of tablesToCreate) {
+            await createTableFromData(tableInfo.tableName, tableInfo.headers, tableInfo.data);
+            totalRows += tableInfo.data.length;
+        }
+        
+        showStatus('Successfully created ' + tablesToCreate.length + ' table(s) with ' + totalRows + ' total rows!');
+        closeSheetSelectModal();
+        loadTables();
+        
+    } catch (error) {
+        showStatus('Error importing: ' + error.message, 'error');
+        console.error('Error:', error);
+    }
+}
+
+// Create table from data object
+async function createTableFromData(tableName, headers, data) {
+    const sanitizedColumns = headers.map(col => {
+        const sanitized = col.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+        return { original: col, sanitized: sanitized || 'column' };
+    });
+    
+    const columnDefs = sanitizedColumns.map(col => col.sanitized + ' TEXT').join(', ');
+    const sql = 'CREATE TABLE ' + tableName + ' (id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY, ' + columnDefs + ', created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE(\'utc\', NOW()))';
+    
+    const { error: createError } = await supabaseClient.rpc('execute_sql', { sql_query: sql });
+    
+    if (createError) {
+        if (createError.message.includes('function') && createError.message.includes('does not exist')) {
+            throw new Error('execute_sql function not found');
+        }
+        throw new Error(createError.message);
+    }
+    
+    // Insert data in batches
+    const batchSize = 50;
+    for (let i = 0; i < data.length; i += batchSize) {
+        const batch = data.slice(i, i + batchSize);
+        
+        const valuesList = batch.map(row => {
+            const values = sanitizedColumns.map(col => {
+                const value = row[col.original];
+                if (value === null || value === undefined) {
+                    return 'NULL';
+                }
+                const escaped = String(value).replace(/'/g, "''");
+                return "'" + escaped + "'";
+            });
+            return '(' + values.join(', ') + ')';
+        }).join(', ');
+        
+        const columnNames = sanitizedColumns.map(col => col.sanitized).join(', ');
+        const insertSql = 'INSERT INTO ' + tableName + ' (' + columnNames + ') VALUES ' + valuesList;
+        
+        const { error: insertError } = await supabaseClient.rpc('execute_sql', { sql_query: insertSql });
+        
+        if (insertError) {
+            throw new Error(insertError.message);
+        }
+    }
+}
+
+// Read file using SheetJS - returns all sheets
 function readFile(file) {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -268,27 +466,46 @@ function readFile(file) {
             try {
                 const data = new Uint8Array(e.target.result);
                 const workbook = XLSX.read(data, { type: 'array' });
-                const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-                const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
                 
-                if (jsonData.length < 2) {
-                    reject(new Error('File must contain at least a header row and one data row'));
+                const sheets = {};
+                
+                workbook.SheetNames.forEach(sheetName => {
+                    const sheet = workbook.Sheets[sheetName];
+                    const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+                    
+                    if (jsonData.length >= 2) {
+                        const headers = jsonData[0].map(h => String(h).trim());
+                        const rows = jsonData.slice(1).filter(row => row.some(cell => cell !== undefined && cell !== null && cell !== ''));
+                        
+                        const result = rows.map(row => {
+                            const obj = {};
+                            headers.forEach((header, index) => {
+                                obj[header] = row[index] !== undefined ? row[index] : null;
+                            });
+                            return obj;
+                        });
+                        
+                        sheets[sheetName] = {
+                            name: sheetName,
+                            headers: headers,
+                            data: result,
+                            rowCount: result.length
+                        };
+                    }
+                });
+                
+                const sheetNames = Object.keys(sheets);
+                if (sheetNames.length === 0) {
+                    reject(new Error('No valid data found in any sheet'));
                     return;
                 }
                 
-                // Convert array of arrays to array of objects with column names
-                const headers = jsonData[0].map(h => String(h).trim());
-                const rows = jsonData.slice(1).filter(row => row.some(cell => cell !== undefined && cell !== null && cell !== ''));
-                
-                const result = rows.map(row => {
-                    const obj = {};
-                    headers.forEach((header, index) => {
-                        obj[header] = row[index] !== undefined ? row[index] : null;
-                    });
-                    return obj;
+                resolve({
+                    fileName: file.name,
+                    sheets: sheets,
+                    sheetNames: sheetNames,
+                    totalSheets: sheetNames.length
                 });
-                
-                resolve(result);
             } catch (error) {
                 reject(error);
             }
@@ -300,154 +517,10 @@ function readFile(file) {
     });
 }
 
-// Generate table name from file name
-function generateTableName(fileName) {
-    const baseName = fileName.replace(/\.[^/.]+$/, '');
-    const sanitized = baseName.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+// Generate table name from sheet name
+function generateTableNameFromSheet(sheetName) {
+    const sanitized = sheetName.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
     return sanitized || 'imported_table';
-}
-
-// Show upload preview
-function showUploadPreview(data) {
-    const preview = document.getElementById('uploadPreview');
-    if (!data || data.length === 0) {
-        preview.innerHTML = '<p>No data to preview</p>';
-        return;
-    }
-    
-    const headers = Object.keys(data[0]);
-    const previewRows = data.slice(0, 5);
-    
-    let html = '<table style="width: 100%; border-collapse: collapse;">' +
-        '<thead><tr>';
-    
-    headers.forEach(header => {
-        html += '<th style="border: 1px solid #ddd; padding: 8px; background: #f5f5f5;">' + header + '</th>';
-    });
-    
-    html += '</tr></thead><tbody>';
-    
-    previewRows.forEach(row => {
-        html += '<tr>';
-        headers.forEach(header => {
-            const value = row[header] !== null ? row[header] : '';
-            html += '<td style="border: 1px solid #ddd; padding: 8px;">' + value + '</td>';
-        });
-        html += '</tr>';
-    });
-    
-    if (data.length > 5) {
-        html += '<tr><td colspan="' + headers.length + '" style="text-align: center; padding: 8px; color: #666;">... and ' + (data.length - 5) + ' more rows</td></tr>';
-    }
-    
-    html += '</tbody></table>';
-    preview.innerHTML = html;
-}
-
-// Close upload modal
-function closeUploadModal() {
-    document.getElementById('uploadModal').style.display = 'none';
-    uploadedData = null;
-    uploadedFileName = null;
-    document.getElementById('uploadFileInfo').textContent = 'No file selected';
-    document.getElementById('uploadTableName').value = '';
-    document.getElementById('uploadPreview').innerHTML = '';
-}
-
-// Create table from upload
-async function createTableFromUpload() {
-    if (!uploadedData || uploadedData.length === 0) {
-        showStatus('No data to import', 'error');
-        return;
-    }
-    
-    const tableName = document.getElementById('uploadTableName').value.trim().toLowerCase().replace(/\s+/g, '_');
-    
-    if (!tableName) {
-        showStatus('Please enter a table name', 'error');
-        return;
-    }
-    
-    // Validate table name
-    if (!/^[a-z][a-z0-9_]*$/.test(tableName)) {
-        showStatus('Table name must start with a letter and contain only lowercase letters, numbers, and underscores', 'error');
-        return;
-    }
-    
-    const columns = Object.keys(uploadedData[0]);
-    
-    // Validate column names
-    for (const col of columns) {
-        const sanitizedCol = col.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
-        if (!sanitizedCol || !/^[a-z][a-z0-9_]*$/.test(sanitizedCol)) {
-            showStatus(`Column "${col}" is invalid. Use only letters, numbers, and underscores`, 'error');
-            return;
-        }
-    }
-    
-    try {
-        showStatus('Creating table and importing data...', 'info');
-        
-        // Build CREATE TABLE SQL with sanitized column names
-        const sanitizedColumns = columns.map(col => {
-            const sanitized = col.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
-            return { original: col, sanitized: sanitized };
-        });
-        
-        const columnDefs = sanitizedColumns.map(col => `${col.sanitized} TEXT`).join(', ');
-        const sql = `
-            CREATE TABLE ${tableName} (
-                id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
-                ${columnDefs},
-                created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW())
-            );
-        `;
-        
-        const { error: createError } = await supabaseClient.rpc('execute_sql', { sql_query: sql });
-        
-        if (createError) {
-            if (createError.message.includes('function') && createError.message.includes('does not exist')) {
-                showStatus('Please create the execute_sql function. See README.', 'error');
-                return;
-            }
-            throw new Error(createError.message);
-        }
-        
-        // Insert data in batches using SQL
-        const batchSize = 50;
-        for (let i = 0; i < uploadedData.length; i += batchSize) {
-            const batch = uploadedData.slice(i, i + batchSize);
-            
-            const valuesList = batch.map(row => {
-                const values = sanitizedColumns.map(col => {
-                    const value = row[col.original];
-                    if (value === null || value === undefined) {
-                        return 'NULL';
-                    }
-                    const escaped = String(value).replace(/'/g, "''");
-                    return "'" + escaped + "'";
-                });
-                return '(' + values.join(', ') + ')';
-            }).join(', ');
-            
-            const columnNames = sanitizedColumns.map(col => col.sanitized).join(', ');
-            const insertSql = `INSERT INTO ${tableName} (${columnNames}) VALUES ${valuesList}`;
-            
-            const { error: insertError } = await supabaseClient.rpc('execute_sql', { sql_query: insertSql });
-            
-            if (insertError) {
-                throw new Error(insertError.message);
-            }
-        }
-        
-        showStatus(`Table "${tableName}" created with ${uploadedData.length} rows!`);
-        closeUploadModal();
-        loadTables();
-        
-    } catch (error) {
-        showStatus('Error creating table: ' + error.message, 'error');
-        console.error('Error:', error);
-    }
 }
 
 // Load all tables from Supabase
