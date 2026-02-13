@@ -8,6 +8,41 @@ let uploadedData = null;
 let uploadedFileName = null;
 let uploadedSheetsData = null;
 
+// Modal drag functionality
+let isDragging = false;
+let currentDragModal = null;
+let dragOffsetX = 0;
+let dragOffsetY = 0;
+
+document.addEventListener('mousedown', function(e) {
+    // Check if clicking on a modal header
+    const header = e.target.closest('.modal-header');
+    if (header) {
+        const modalContent = header.closest('.modal-content');
+        if (modalContent) {
+            isDragging = true;
+            currentDragModal = modalContent;
+            const rect = modalContent.getBoundingClientRect();
+            dragOffsetX = e.clientX - rect.left;
+            dragOffsetY = e.clientY - rect.top;
+            modalContent.style.position = 'fixed';
+            modalContent.style.margin = '0';
+        }
+    }
+});
+
+document.addEventListener('mousemove', function(e) {
+    if (isDragging && currentDragModal) {
+        currentDragModal.style.left = (e.clientX - dragOffsetX) + 'px';
+        currentDragModal.style.top = (e.clientY - dragOffsetY) + 'px';
+    }
+});
+
+document.addEventListener('mouseup', function() {
+    isDragging = false;
+    currentDragModal = null;
+});
+
 // script.js
 
 const toggleBtn = document.getElementById('dark-mode-toggle');
@@ -225,6 +260,15 @@ function enableUploadButton() {
 async function handleFileUpload(event) {
     const file = event.target.files[0];
     if (!file) return;
+    
+    // File size limit: 10MB for Excel files
+    const maxSizeMB = 10;
+    const maxSizeBytes = maxSizeMB * 1024 * 1024;
+    if (file.size > maxSizeBytes) {
+        showStatus(`File too large. Maximum size is ${maxSizeMB}MB`, 'error');
+        event.target.value = '';
+        return;
+    }
     
     if (!supabaseClient) {
         showStatus('Please configure Supabase settings first', 'warning');
@@ -475,12 +519,17 @@ function readFile(file) {
                     
                     if (jsonData.length >= 2) {
                         const headers = jsonData[0].map(h => String(h).trim());
+                        const headerCount = headers.length;
+                        
+                        // Process rows, filling in missing cells (handles merged cells)
                         const rows = jsonData.slice(1).filter(row => row.some(cell => cell !== undefined && cell !== null && cell !== ''));
                         
                         const result = rows.map(row => {
                             const obj = {};
                             headers.forEach((header, index) => {
-                                obj[header] = row[index] !== undefined ? row[index] : null;
+                                // Handle merged cells by ensuring row has enough elements
+                                const value = row[index];
+                                obj[header] = (value !== undefined && value !== null) ? value : null;
                             });
                             return obj;
                         });

@@ -449,6 +449,7 @@ body.dark-mode .preview-sheet-btn:hover {
     width: 90%;
     max-width: 600px;
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+    cursor: move; /* For draggable modals */
 }
 
 .modal-header {
@@ -458,6 +459,7 @@ body.dark-mode .preview-sheet-btn:hover {
     margin-bottom: 24px;
     padding-bottom: 16px;
     border-bottom: 1px solid #d0d7de;
+    cursor: move; /* Indicate draggable */
 }
 
 body.dark-mode .modal-header {
