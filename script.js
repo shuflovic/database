@@ -45,15 +45,13 @@ function loadSettings() {
 
 // Update connection status indicator
 function updateConnectionStatus(connected) {
-    const statusEl = document.getElementById('connectionStatus');
-    if (!statusEl) return;
+    const dotEl = document.getElementById('connectionDot');
+    if (!dotEl) return;
     
     if (connected) {
-        statusEl.className = 'connection-status connected';
-        statusEl.textContent = '✓ Connected';
+        dotEl.className = 'connection-dot connected';
     } else {
-        statusEl.className = 'connection-status disconnected';
-        statusEl.textContent = '✗ Not Connected';
+        dotEl.className = 'connection-dot disconnected';
     }
 }
 

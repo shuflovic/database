@@ -13,11 +13,15 @@
         <p>Create and manage your custom tables - track anything with rows and columns!</p>
         <div>
             <button class="create-list-btn" id="createTableBtn" onclick="openCreateModal()" disabled>Create New Table</button>
-            <button class="settings-btn" onclick="openSettingsModal()">⚙️ Settings</button>
-            <span class="connection-status disconnected" id="connectionStatus">Not Connected</span>
         </div>
     </div>
-<button id="dark-mode-toggle">Toggle Dark Mode</button>
+
+    <!-- Right Toolbar -->
+    <div class="right-toolbar">
+        <button id="dark-mode-toggle" title="Toggle Dark Mode"></button>
+        <button class="settings-btn-icon" onclick="openSettingsModal()" title="Settings">⚙️</button>
+        <span class="connection-dot" id="connectionDot" title="Connection Status"></span>
+    </div>
     <div id="status"></div>
     
     <div id="tablesContainer">

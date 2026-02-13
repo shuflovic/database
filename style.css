@@ -107,21 +107,38 @@ body.dark-mode .add-row-form {
     border-bottom-color: #30363d;
 }
 
-/* Dark mode toggle button */
-#dark-mode-toggle {
+/* Right-side vertical toolbar */
+.right-toolbar {
     position: fixed;
     top: 20px;
     right: 20px;
-    padding: 8px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    z-index: 1001;
+}
+
+/* Dark mode toggle button - icon only */
+#dark-mode-toggle {
+    width: 40px;
+    height: 40px;
+    padding: 0;
     background: #24292f;
     color: #ffffff;
     border: 1px solid #d0d7de;
-    border-radius: 6px;
+    border-radius: 50%;
     cursor: pointer;
-    font-size: 14px;
-    font-weight: 500;
+    font-size: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     transition: all 0.2s ease;
-    z-index: 1001;
+}
+
+#dark-mode-toggle::before {
+    content: '◐';
+    margin: 0;
+    font-size: 18px;
 }
 
 #dark-mode-toggle:hover {
@@ -144,10 +161,61 @@ body.dark-mode #dark-mode-toggle:hover {
     border-color: #484f58;
 }
 
-#dark-mode-toggle::before {
-    content: '◐';
-    margin-right: 6px;
-    font-size: 16px;
+/* Settings button - icon only */
+.settings-btn-icon {
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    background: #24292f;
+    color: #ffffff;
+    border: 1px solid #24292f;
+    border-radius: 20%;
+    cursor: pointer;
+    font-size: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+.settings-btn-icon:hover {
+    background: #32383f;
+    border-color: #32383f;
+}
+
+body.dark-mode .settings-btn-icon {
+    background: #238636;
+    border-color: #238636;
+}
+
+body.dark-mode .settings-btn-icon:hover {
+    background: #2ea043;
+    border-color: #2ea043;
+}
+
+/* Connection dot indicator */
+.connection-dot {
+    justify-content: center;
+    align-items: center;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background-color: #cf222e;
+    border: 1px solid #ffffff;
+    box-shadow: 0 0 0 1px #d0d7de;
+    transition: all 0.2s ease;
+}
+
+body.dark-mode .connection-dot {
+    box-shadow: 0 0 0 1px #30363d;
+}
+
+.connection-dot.connected {
+    background-color: #2ea043;
+}
+
+.connection-dot.disconnected {
+    background-color: #cf222e;
 }
 
 .header {
