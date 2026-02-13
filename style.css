@@ -284,8 +284,19 @@ body.dark-mode .settings-btn:hover {
     cursor: pointer;
     font-size: 14px;
     font-weight: 500;
+    margin-right: 12px;
     margin-bottom: 16px;
     transition: all 0.2s ease;
+}
+
+#uploadTableBtn {
+    background-color: #0969da;
+    border-color: #0969da;
+}
+
+#uploadTableBtn:hover {
+    background-color: #1a73e8;
+    border-color: #1a73e8;
 }
 
 .create-list-btn:hover {
@@ -311,6 +322,27 @@ body.dark-mode .create-list-btn:hover {
 }
 
 body.dark-mode .create-list-btn:disabled {
+    background-color: #21262d;
+    border-color: #30363d;
+    color: #8b949e;
+}
+
+#uploadTableBtn:disabled {
+    background-color: #d0d7de;
+    border-color: #d0d7de;
+}
+
+body.dark-mode #uploadTableBtn {
+    background-color: #1f6feb;
+    border-color: #1f6feb;
+}
+
+body.dark-mode #uploadTableBtn:hover {
+    background-color: #388bfd;
+    border-color: #388bfd;
+}
+
+body.dark-mode #uploadTableBtn:disabled {
     background-color: #21262d;
     border-color: #30363d;
     color: #8b949e;

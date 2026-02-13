@@ -4,6 +4,8 @@ let tables = [];
 let currentEditRow = null;
 let currentEditTable = null;
 let currentManagementTable = null;
+let uploadedData = null;
+let uploadedFileName = null;
 
 // script.js
 
@@ -32,6 +34,7 @@ function loadSettings() {
             updateConnectionStatus(true);
             const btn = document.getElementById('createTableBtn');
             if (btn) btn.disabled = false;
+            enableUploadButton();
             loadTables();
             return true;
         } catch (error) {
@@ -104,6 +107,7 @@ function saveSettings() {
         updateConnectionStatus(true);
         const btn = document.getElementById('createTableBtn');
         if (btn) btn.disabled = false;
+        enableUploadButton();
         
         showStatus('Settings saved! Loading your tables...');
         closeSettingsModal();
@@ -206,6 +210,242 @@ async function createTable() {
         }
     } catch (error) {
         showStatus('Connection error', 'error');
+        console.error('Error:', error);
+    }
+}
+
+// Enable upload button when connected
+function enableUploadButton() {
+    const btn = document.getElementById('uploadTableBtn');
+    if (btn) btn.disabled = false;
+}
+
+// Handle file upload
+async function handleFileUpload(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    
+    if (!supabaseClient) {
+        showStatus('Please configure Supabase settings first', 'warning');
+        openSettingsModal();
+        event.target.value = '';
+        return;
+    }
+    
+    const fileName = file.name.toLowerCase();
+    if (!fileName.endsWith('.csv') && !fileName.endsWith('.xlsx') && !fileName.endsWith('.xls')) {
+        showStatus('Please select a CSV or Excel file', 'error');
+        event.target.value = '';
+        return;
+    }
+    
+    try {
+        const data = await readFile(file);
+        uploadedData = data;
+        uploadedFileName = file.name;
+        
+        // Show upload modal
+        document.getElementById('uploadFileInfo').textContent = `Selected: ${file.name} (${data.length} rows)`;
+        document.getElementById('uploadTableName').value = generateTableName(file.name);
+        
+        // Show preview
+        showUploadPreview(data);
+        
+        document.getElementById('uploadModal').style.display = 'block';
+    } catch (error) {
+        showStatus('Error reading file: ' + error.message, 'error');
+        console.error('Error reading file:', error);
+    }
+    
+    event.target.value = '';
+}
+
+// Read file using SheetJS
+function readFile(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
+                
+                if (jsonData.length < 2) {
+                    reject(new Error('File must contain at least a header row and one data row'));
+                    return;
+                }
+                
+                // Convert array of arrays to array of objects with column names
+                const headers = jsonData[0].map(h => String(h).trim());
+                const rows = jsonData.slice(1).filter(row => row.some(cell => cell !== undefined && cell !== null && cell !== ''));
+                
+                const result = rows.map(row => {
+                    const obj = {};
+                    headers.forEach((header, index) => {
+                        obj[header] = row[index] !== undefined ? row[index] : null;
+                    });
+                    return obj;
+                });
+                
+                resolve(result);
+            } catch (error) {
+                reject(error);
+            }
+        };
+        reader.onerror = function() {
+            reject(new Error('Failed to read file'));
+        };
+        reader.readAsArrayBuffer(file);
+    });
+}
+
+// Generate table name from file name
+function generateTableName(fileName) {
+    const baseName = fileName.replace(/\.[^/.]+$/, '');
+    const sanitized = baseName.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+    return sanitized || 'imported_table';
+}
+
+// Show upload preview
+function showUploadPreview(data) {
+    const preview = document.getElementById('uploadPreview');
+    if (!data || data.length === 0) {
+        preview.innerHTML = '<p>No data to preview</p>';
+        return;
+    }
+    
+    const headers = Object.keys(data[0]);
+    const previewRows = data.slice(0, 5);
+    
+    let html = '<table style="width: 100%; border-collapse: collapse;">' +
+        '<thead><tr>';
+    
+    headers.forEach(header => {
+        html += '<th style="border: 1px solid #ddd; padding: 8px; background: #f5f5f5;">' + header + '</th>';
+    });
+    
+    html += '</tr></thead><tbody>';
+    
+    previewRows.forEach(row => {
+        html += '<tr>';
+        headers.forEach(header => {
+            const value = row[header] !== null ? row[header] : '';
+            html += '<td style="border: 1px solid #ddd; padding: 8px;">' + value + '</td>';
+        });
+        html += '</tr>';
+    });
+    
+    if (data.length > 5) {
+        html += '<tr><td colspan="' + headers.length + '" style="text-align: center; padding: 8px; color: #666;">... and ' + (data.length - 5) + ' more rows</td></tr>';
+    }
+    
+    html += '</tbody></table>';
+    preview.innerHTML = html;
+}
+
+// Close upload modal
+function closeUploadModal() {
+    document.getElementById('uploadModal').style.display = 'none';
+    uploadedData = null;
+    uploadedFileName = null;
+    document.getElementById('uploadFileInfo').textContent = 'No file selected';
+    document.getElementById('uploadTableName').value = '';
+    document.getElementById('uploadPreview').innerHTML = '';
+}
+
+// Create table from upload
+async function createTableFromUpload() {
+    if (!uploadedData || uploadedData.length === 0) {
+        showStatus('No data to import', 'error');
+        return;
+    }
+    
+    const tableName = document.getElementById('uploadTableName').value.trim().toLowerCase().replace(/\s+/g, '_');
+    
+    if (!tableName) {
+        showStatus('Please enter a table name', 'error');
+        return;
+    }
+    
+    // Validate table name
+    if (!/^[a-z][a-z0-9_]*$/.test(tableName)) {
+        showStatus('Table name must start with a letter and contain only lowercase letters, numbers, and underscores', 'error');
+        return;
+    }
+    
+    const columns = Object.keys(uploadedData[0]);
+    
+    // Validate column names
+    for (const col of columns) {
+        const sanitizedCol = col.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+        if (!sanitizedCol || !/^[a-z][a-z0-9_]*$/.test(sanitizedCol)) {
+            showStatus(`Column "${col}" is invalid. Use only letters, numbers, and underscores`, 'error');
+            return;
+        }
+    }
+    
+    try {
+        showStatus('Creating table and importing data...', 'info');
+        
+        // Build CREATE TABLE SQL with sanitized column names
+        const sanitizedColumns = columns.map(col => {
+            const sanitized = col.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+            return { original: col, sanitized: sanitized };
+        });
+        
+        const columnDefs = sanitizedColumns.map(col => `${col.sanitized} TEXT`).join(', ');
+        const sql = `
+            CREATE TABLE ${tableName} (
+                id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+                ${columnDefs},
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW())
+            );
+        `;
+        
+        const { error: createError } = await supabaseClient.rpc('execute_sql', { sql_query: sql });
+        
+        if (createError) {
+            if (createError.message.includes('function') && createError.message.includes('does not exist')) {
+                showStatus('Please create the execute_sql function. See README.', 'error');
+                return;
+            }
+            throw new Error(createError.message);
+        }
+        
+        // Insert data in batches using SQL
+        const batchSize = 50;
+        for (let i = 0; i < uploadedData.length; i += batchSize) {
+            const batch = uploadedData.slice(i, i + batchSize);
+            
+            const valuesList = batch.map(row => {
+                const values = sanitizedColumns.map(col => {
+                    const value = row[col.original];
+                    if (value === null || value === undefined) {
+                        return 'NULL';
+                    }
+                    const escaped = String(value).replace(/'/g, "''");
+                    return "'" + escaped + "'";
+                });
+                return '(' + values.join(', ') + ')';
+            }).join(', ');
+            
+            const columnNames = sanitizedColumns.map(col => col.sanitized).join(', ');
+            const insertSql = `INSERT INTO ${tableName} (${columnNames}) VALUES ${valuesList}`;
+            
+            const { error: insertError } = await supabaseClient.rpc('execute_sql', { sql_query: insertSql });
+            
+            if (insertError) {
+                throw new Error(insertError.message);
+            }
+        }
+        
+        showStatus(`Table "${tableName}" created with ${uploadedData.length} rows!`);
+        closeUploadModal();
+        loadTables();
+        
+    } catch (error) {
+        showStatus('Error creating table: ' + error.message, 'error');
         console.error('Error:', error);
     }
 }
