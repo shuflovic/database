@@ -25,6 +25,11 @@ body.dark-mode .table-container {
     border-color: #30363d;
 }
 
+body.dark-mode .table-container:hover {
+    box-shadow: 0 0 20px rgba(56, 139, 253, 0.4), 0 0 40px rgba(56, 139, 253, 0.2);
+    border-color: #388bfd;
+}
+
 body.dark-mode .modal-content {
     background-color: #161b22;
     color: #c9d1d9;
@@ -634,6 +639,13 @@ body.dark-mode .submit-btn:hover {
     height: 420px;
     display: flex;
     flex-direction: column;
+    transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+}
+
+.table-container:hover {
+    transform: scale(1.02);
+    box-shadow: 0 0 20px rgba(9, 105, 218, 0.4), 0 0 40px rgba(9, 105, 218, 0.2);
+    border-color: #58a6ff;
 }
 
 .table-header {
@@ -1127,4 +1139,64 @@ body.dark-mode ::-webkit-scrollbar-thumb {
 
 body.dark-mode ::-webkit-scrollbar-thumb:hover {
     background: #484f58;
+}
+
+/* Hidden utility class */
+.hidden {
+    display: none;
+}
+
+/* File info display */
+.file-info {
+    padding: 10px;
+    background: #f0f0f0;
+    border-radius: 4px;
+    margin-bottom: 10px;
+}
+
+/* Preview containers */
+.preview-scroll {
+    overflow-x: auto;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+/* Sheet list container */
+.sheet-list {
+    max-height: 300px;
+    overflow-y: auto;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+/* Sheet count display */
+.sheet-count {
+    margin: 10px 0;
+    font-weight: 500;
+    color: #666;
+}
+
+/* Wide modal */
+.modal-content.wide {
+    max-width: 800px;
+}
+
+/* Sheet preview content */
+.sheet-preview-content {
+    overflow-x: auto;
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+body.dark-mode .file-info {
+    background: #21262d;
+    color: #c9d1d9;
+}
+
+body.dark-mode .sheet-list {
+    border-color: #30363d;
+}
+
+body.dark-mode .sheet-count {
+    color: #8b949e;
 }

@@ -15,7 +15,7 @@
         <div>
             <button class="create-list-btn" id="createTableBtn" onclick="openCreateModal()" disabled>Create New Table</button>
             <button class="create-list-btn" id="uploadTableBtn" onclick="document.getElementById('fileInput').click()" disabled>📁 Upload Table</button>
-            <input type="file" id="fileInput" accept=".csv,.xlsx,.xls" style="display: none;" onchange="handleFileUpload(event)">
+            <input type="file" id="fileInput" title="form" class="hidden" accept=".csv,.xlsx,.xls" onchange="handleFileUpload(event)">
         </div>
     </div>
 
@@ -97,7 +97,7 @@
             
             <div class="form-group">
                 <label for="uploadFileName">File:</label>
-                <div id="uploadFileInfo" style="padding: 10px; background: #f0f0f0; border-radius: 4px; margin-bottom: 10px;">No file selected</div>
+                <div id="uploadFileInfo" class="file-info">No file selected</div>
             </div>
             
             <div class="form-group">
@@ -107,7 +107,7 @@
             
             <div class="form-group">
                 <label>Preview (first 5 rows):</label>
-                <div id="uploadPreview" style="overflow-x: auto; max-height: 200px; overflow-y: auto;"></div>
+                <div id="uploadPreview" class="preview-scroll"></div>
             </div>
             
             <button class="submit-btn" onclick="createTableFromUpload()">Create Table & Import Data</button>
@@ -116,20 +116,20 @@
 
     <!-- Sheet Selection Modal -->
     <div id="sheetSelectModal" class="modal">
-        <div class="modal-content" style="max-width: 800px;">
+        <div class="modal-content wide">
             <div class="modal-header">
                 <h2>Select Sheets to Import</h2>
                 <span class="close" onclick="closeSheetSelectModal()">&times;</span>
             </div>
             
-            <div id="sheetSelectFileInfo" style="padding: 10px; background: #f0f0f0; border-radius: 4px; margin-bottom: 15px;"></div>
+            <div id="sheetSelectFileInfo" class="file-info"></div>
             
             <div class="form-group">
                 <label>Sheets:</label>
-                <div id="sheetList" style="max-height: 300px; overflow-y: auto; border: 1px solid #ddd; border-radius: 4px;"></div>
+                <div id="sheetList" class="sheet-list"></div>
             </div>
             
-            <div id="selectedSheetCount" style="margin: 10px 0; font-weight: 500; color: #666;"></div>
+            <div id="selectedSheetCount" class="sheet-count"></div>
             
             <button class="submit-btn" onclick="importSelectedSheets()">Create Selected Tables</button>
         </div>
@@ -137,13 +137,13 @@
 
     <!-- Sheet Preview Modal -->
     <div id="sheetPreviewModal" class="modal">
-        <div class="modal-content" style="max-width: 800px;">
+        <div class="modal-content wide">
             <div class="modal-header">
                 <h2 id="sheetPreviewTitle">Sheet Preview</h2>
                 <span class="close" onclick="closeSheetPreviewModal()">&times;</span>
             </div>
             
-            <div id="sheetPreviewContent" style="overflow-x: auto; max-height: 400px; overflow-y: auto;"></div>
+            <div id="sheetPreviewContent" class="sheet-preview-content"></div>
         </div>
     </div>
 
